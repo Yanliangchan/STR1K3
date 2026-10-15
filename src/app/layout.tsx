@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "STR1K3", template: "%s · STR1K3" },
-  description: "Instructor records for NORs, CROWs and statements.",
+  description: "Standards, Discipline, Digitised. Instructor records for NORs, CROWs and statements.",
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "STR1K3", statusBarStyle: "default" },

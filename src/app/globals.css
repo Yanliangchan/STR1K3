@@ -220,6 +220,12 @@
 @keyframes wm-in { to { opacity: 1; transform: none; } }
 @keyframes wm-orange { to { color: #f26b1d; } }
 
+/* Tagline fades in once the wordmark has landed. */
+.tagline-anim {
+  opacity: 0;
+  animation: wm-in 0.5s ease-out 1.4s forwards;
+}
+
 /* Launch splash: shown once per session, never blocks taps. */
 .splash {
   position: fixed;

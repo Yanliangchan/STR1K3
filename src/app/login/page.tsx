@@ -18,7 +18,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="mt-2 text-2xl">
             <AnimatedWordmark />
           </h1>
-          <p className="mt-1 text-sm text-slate-600">Instructor records — NORs, CROWs and statements</p>
+          <p className="tagline-anim mt-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500" data-testid="tagline">
+            Standards, Discipline, Digitised
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm sm:p-6">
           <LoginForm next={sp.next} notice={notice} />

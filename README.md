@@ -1,5 +1,7 @@
 # STR1K3
 
+*Standards, Discipline, Digitised.*
+
 Instructor-only, mobile-first web app for recording **NORs** (Negative Observation Records), **CROWs** and **statements** against cadets, batch by batch.
 
 Instructors open the app and land straight in the **active batch**. From there they can find cadets, select one or many, enter details once, and create an individual record for each selected cadet. They can then track each cadet's statement from request to acceptance and review statistics drawn from the saved records.
