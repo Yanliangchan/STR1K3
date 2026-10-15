@@ -1,0 +1,378 @@
+// STR1K3 database schema.
+//
+// Hierarchy: Batch -> Byte -> Cadet -> Records (NOR / CROW) and Statements.
+// Batch isolation is enforced with composite foreign keys (cadetId + batchId)
+// and with database triggers defined in the initial migration.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Instructors and sessions
+// ---------------------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique // stored lower-case
+  passwordHash       String
+  isAdmin            Boolean   @default(false)
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  lastLoginAt        DateTime?
+
+  sessions Session[]
+
+  batchesCreated     Batch[]            @relation("BatchCreatedBy")
+  batchesArchived    Batch[]            @relation("BatchArchivedBy")
+  recordsCreated     Record[]           @relation("RecordCreatedBy")
+  recordsUpdated     Record[]           @relation("RecordUpdatedBy")
+  recordsVoided      Record[]           @relation("RecordVoidedBy")
+  statementsCreated  Statement[]        @relation("StatementCreatedBy")
+  statementsUpdated  Statement[]        @relation("StatementUpdatedBy")
+  statementsVoided   Statement[]        @relation("StatementVoidedBy")
+  versionsRecorded   StatementVersion[] @relation("VersionRecordedBy")
+  reviews            StatementReview[]
+  occurrencesCreated Occurrence[]
+  bulkOperations     BulkOperation[]
+  auditEvents        AuditEvent[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique // SHA-256 of the cookie token; the raw token is never stored
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime // absolute maximum lifetime
+  userAgent  String?
+  ip         String?
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+// Singleton row (id = 1, enforced by a CHECK constraint). Holding the active
+// batch here means at most one batch can ever be active.
+model AppConfig {
+  id                  Int      @id @default(1)
+  activeBatchId       String?  @unique
+  activeBatch         Batch?   @relation("ActiveBatch", fields: [activeBatchId], references: [id], onDelete: Restrict)
+  recurringThreshold  Int      @default(3)
+  recurringWindowDays Int? // null = whole batch
+  updatedAt           DateTime @updatedAt
+}
+
+enum RecordType {
+  NOR
+  CROW
+}
+
+model Category {
+  id         String     @id @default(cuid())
+  recordType RecordType
+  name       String
+  active     Boolean    @default(true)
+  sortOrder  Int        @default(0)
+  createdAt  DateTime   @default(now())
+
+  records Record[]
+
+  @@unique([recordType, name])
+}
+
+// ---------------------------------------------------------------------------
+// Batch hierarchy
+// ---------------------------------------------------------------------------
+
+enum BatchStatus {
+  OPEN
+  ARCHIVED
+}
+
+model Batch {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  description  String?
+  status       BatchStatus @default(OPEN)
+  expectedSize Int?
+  createdAt    DateTime    @default(now())
+  createdById  String
+  createdBy    User        @relation("BatchCreatedBy", fields: [createdById], references: [id])
+  archivedAt   DateTime?
+  archivedById String?
+  archivedBy   User?       @relation("BatchArchivedBy", fields: [archivedById], references: [id])
+  archiveNote  String?
+
+  activeConfig   AppConfig?      @relation("ActiveBatch")
+  bytes          Byte[]
+  cadets         Cadet[]
+  records        Record[]
+  statements     Statement[]
+  occurrences    Occurrence[]
+  bulkOperations BulkOperation[]
+  auditEvents    AuditEvent[]
+}
+
+enum ByteStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Byte {
+  id        String     @id @default(cuid())
+  batchId   String
+  batch     Batch      @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  name      String
+  sortOrder Int        @default(0)
+  status    ByteStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+
+  cadets Cadet[]
+
+  @@unique([batchId, name])
+  @@unique([id, batchId])
+}
+
+enum CadetStatus {
+  ACTIVE
+  REMOVED
+  TRANSFERRED
+}
+
+model Cadet {
+  id                String      @id @default(cuid())
+  batchId           String
+  batch             Batch       @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  // Byte must belong to the same batch: enforced by trigger cadet_byte_same_batch.
+  byteId            String?
+  byte              Byte?       @relation(fields: [byteId], references: [id], onDelete: SetNull)
+  name              String
+  notes             String?
+  status            CadetStatus @default(ACTIVE)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  // When a cadet is transferred, a new cadet row is created in the target batch
+  // and linked back here. Records stay with the batch they were created in.
+  transferredFromId String?     @unique
+  transferredFrom   Cadet?      @relation("CadetTransfer", fields: [transferredFromId], references: [id])
+  transferredTo     Cadet?      @relation("CadetTransfer")
+
+  records    Record[]
+  statements Statement[]
+
+  @@unique([id, batchId])
+  @@index([batchId, status])
+  @@index([batchId, byteId])
+}
+
+// Optional shared reference linking records/statements that arose from one event.
+model Occurrence {
+  id          String    @id @default(cuid())
+  batchId     String
+  batch       Batch     @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  title       String
+  occurredOn  DateTime? @db.Date
+  createdAt   DateTime  @default(now())
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+
+  records    Record[]
+  statements Statement[]
+
+  @@unique([id, batchId])
+  @@index([batchId, createdAt])
+}
+
+model BulkOperation {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique
+  batchId        String
+  batch          Batch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  kind           String // NOR | CROW | STATEMENT
+  count          Int
+  createdAt      DateTime @default(now())
+  createdById    String
+  createdBy      User     @relation(fields: [createdById], references: [id])
+
+  records    Record[]
+  statements Statement[]
+}
+
+// ---------------------------------------------------------------------------
+// Records
+// ---------------------------------------------------------------------------
+
+enum EntryStatus {
+  ACTIVE
+  VOIDED
+}
+
+// NOR and CROW records. The type is kept as a distinct, first-class column.
+model Record {
+  id              String         @id @default(cuid())
+  batchId         String
+  batch           Batch          @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  cadetId         String
+  cadet           Cadet          @relation(fields: [cadetId, batchId], references: [id, batchId], onDelete: Restrict)
+  type            RecordType
+  categoryId      String?
+  category        Category?      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  description     String
+  notes           String?
+  referenceNo     String?
+  occurredOn      DateTime       @db.Date
+  occurredTime    String? // "HH:MM" when known
+  occurrenceId    String?
+  occurrence      Occurrence?    @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
+  bulkOperationId String?
+  bulkOperation   BulkOperation? @relation(fields: [bulkOperationId], references: [id], onDelete: SetNull)
+  status          EntryStatus    @default(ACTIVE)
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidedBy        User?          @relation("RecordVoidedBy", fields: [voidedById], references: [id])
+  createdAt       DateTime       @default(now())
+  createdById     String
+  createdBy       User           @relation("RecordCreatedBy", fields: [createdById], references: [id])
+  updatedAt       DateTime       @updatedAt
+  updatedById     String?
+  updatedBy       User?          @relation("RecordUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([batchId, type, status])
+  @@index([cadetId])
+  @@index([batchId, occurredOn])
+  @@index([occurrenceId])
+}
+
+enum StatementStatus {
+  NOT_SUBMITTED
+  PENDING_REVIEW
+  REWRITE_REQUIRED
+  ACCEPTED
+}
+
+// One row per statement workflow (per cadet). Versions hold the submissions.
+model Statement {
+  id              String          @id @default(cuid())
+  batchId         String
+  batch           Batch           @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  cadetId         String
+  cadet           Cadet           @relation(fields: [cadetId, batchId], references: [id, batchId], onDelete: Restrict)
+  title           String
+  instructions    String?
+  notes           String?
+  status          StatementStatus @default(NOT_SUBMITTED)
+  requestedOn     DateTime        @db.Date
+  lastReceivedAt  DateTime?
+  acceptedAt      DateTime?
+  occurrenceId    String?
+  occurrence      Occurrence?     @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
+  bulkOperationId String?
+  bulkOperation   BulkOperation?  @relation(fields: [bulkOperationId], references: [id], onDelete: SetNull)
+  voided          Boolean         @default(false)
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidedBy        User?           @relation("StatementVoidedBy", fields: [voidedById], references: [id])
+  createdAt       DateTime        @default(now())
+  createdById     String
+  createdBy       User            @relation("StatementCreatedBy", fields: [createdById], references: [id])
+  updatedAt       DateTime        @updatedAt
+  updatedById     String?
+  updatedBy       User?           @relation("StatementUpdatedBy", fields: [updatedById], references: [id])
+
+  versions StatementVersion[]
+  reviews  StatementReview[]
+
+  @@index([batchId, status, voided])
+  @@index([cadetId])
+  @@index([occurrenceId])
+}
+
+enum ReviewOutcome {
+  ACCEPTED
+  REWRITE_REQUIRED
+}
+
+model StatementVersion {
+  id            String    @id @default(cuid())
+  statementId   String
+  statement     Statement @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  versionNumber Int
+  content       String?
+  receivedAt    DateTime
+  recordedById  String
+  recordedBy    User      @relation("VersionRecordedBy", fields: [recordedById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  reviews StatementReview[]
+
+  @@unique([statementId, versionNumber])
+}
+
+// Each review decision on a version. Kept separately so reopening an accepted
+// statement adds a new review rather than overwriting the earlier one.
+model StatementReview {
+  id           String            @id @default(cuid())
+  statementId  String
+  statement    Statement         @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  versionId    String?
+  version      StatementVersion? @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  outcome      ReviewOutcome
+  feedback     String?
+  reviewedAt   DateTime          @default(now())
+  reviewedById String
+  reviewedBy   User              @relation(fields: [reviewedById], references: [id])
+
+  @@index([statementId, reviewedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Audit (append-only: UPDATE/DELETE blocked by trigger)
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  entityType String
+  entityId   String?
+  batchId    String?
+  batch      Batch?   @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  cadetId    String?
+  summary    String
+  changes    Json?
+  reason     String?
+
+  @@index([batchId, createdAt])
+  @@index([entityType, entityId])
+  @@index([cadetId])
+  @@index([createdAt])
+}
