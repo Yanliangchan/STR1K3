@@ -132,7 +132,7 @@ export function AppShell({
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface/95 pt-safe backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
           <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="STR1K3 home">
-            <Logo className="h-7 w-7" />
+            <Logo className="h-8 w-8 text-slate-900" />
           </Link>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium uppercase leading-none tracking-wide text-slate-500">Active batch</p>

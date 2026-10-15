@@ -5,24 +5,38 @@
 
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --color-navy-50: #f1f4f9;
-  --color-navy-100: #dfe6f1;
-  --color-navy-200: #bccbe1;
-  --color-navy-300: #8fa6c8;
-  --color-navy-400: #5f7eab;
-  --color-navy-500: #3f5f8e;
-  --color-navy-600: #2f4a73;
-  --color-navy-700: #253b5d;
-  --color-navy-800: #1c2d48;
-  --color-navy-900: #142036;
-  --color-navy-950: #0c1424;
+  --color-navy-50: #fff4ed;
+  --color-navy-100: #ffe6d5;
+  --color-navy-200: #fdc9a8;
+  --color-navy-300: #fba371;
+  --color-navy-400: #f7793a;
+  --color-navy-500: #f26b1d;
+  --color-navy-600: #d9540b;
+  --color-navy-700: #b3420a;
+  --color-navy-800: #8a330b;
+  --color-navy-900: #1c1917;
+  --color-navy-950: #0c0a09;
+
+  /* Neutrals: true greys to sit with black + orange. */
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f4f4f5;
+  --color-slate-200: #e4e4e7;
+  --color-slate-300: #d4d4d8;
+  --color-slate-400: #a1a1aa;
+  --color-slate-500: #71717a;
+  --color-slate-600: #52525b;
+  --color-slate-700: #3f3f46;
+  --color-slate-800: #27272a;
+  --color-slate-900: #18181b;
+  --color-slate-950: #09090b;
 
   /* Semantic tokens (light values; dark values below). */
+  --color-brand: #f26b1d;
   --color-surface: #ffffff;
-  --color-primary: #1c2d48;
-  --color-primary-hover: #253b5d;
-  --color-primary-strong: #142036;
-  --color-on-primary-muted: #dfe6f1;
+  --color-primary: #18181b;
+  --color-primary-hover: #27272a;
+  --color-primary-strong: #09090b;
+  --color-on-primary-muted: #d4d4d8;
   --color-danger: #b91c1c;
   --color-danger-hover: #991b1b;
   --color-crow: #9f1239;
@@ -35,38 +49,39 @@
  */
 .dark {
   color-scheme: dark;
-  --color-surface: #111a2a;
-  --color-primary: #3b5f9e;
-  --color-primary-hover: #4870b5;
-  --color-primary-strong: #2c4a80;
-  --color-on-primary-muted: #d6e2f7;
+  --color-surface: #18181b;
+  /* Deep orange keeps white button text at AA contrast (5.2:1). */
+  --color-primary: #c2410c;
+  --color-primary-hover: #d24a10;
+  --color-primary-strong: #9a3412;
+  --color-on-primary-muted: #fed7aa;
   --color-danger: #b42323;
   --color-danger-hover: #c53030;
   --color-crow: #b4304f;
 
-  --color-slate-50: #0a101c;
-  --color-slate-100: #1a2436;
-  --color-slate-200: #243044;
-  --color-slate-300: #3a4862;
-  --color-slate-400: #6b7a93;
-  --color-slate-500: #94a3b8;
-  --color-slate-600: #aab6c8;
-  --color-slate-700: #c7d0dd;
-  --color-slate-800: #dde3ec;
-  --color-slate-900: #eef2f7;
-  --color-slate-950: #f8fafc;
+  --color-slate-50: #0b0b0c;
+  --color-slate-100: #1f1f23;
+  --color-slate-200: #2a2a2f;
+  --color-slate-300: #3f3f46;
+  --color-slate-400: #71717a;
+  --color-slate-500: #a1a1aa;
+  --color-slate-600: #b4b4bb;
+  --color-slate-700: #d4d4d8;
+  --color-slate-800: #e4e4e7;
+  --color-slate-900: #f4f4f5;
+  --color-slate-950: #fafafa;
 
-  --color-navy-50: #16223a;
-  --color-navy-100: #1d2c4b;
-  --color-navy-200: #2b3f66;
-  --color-navy-300: #3d5585;
-  --color-navy-400: #5672a6;
-  --color-navy-500: #7a93c4;
-  --color-navy-600: #9ab0db;
-  --color-navy-700: #b3c6ea;
-  --color-navy-800: #c9d7f1;
-  --color-navy-900: #dfe8f8;
-  --color-navy-950: #eef3fc;
+  --color-navy-50: #2a160b;
+  --color-navy-100: #3a1d0c;
+  --color-navy-200: #5a2a0f;
+  --color-navy-300: #7c3912;
+  --color-navy-400: #c2551b;
+  --color-navy-500: #f26b1d;
+  --color-navy-600: #fb8c4c;
+  --color-navy-700: #fdae7d;
+  --color-navy-800: #fed2b3;
+  --color-navy-900: #fafaf9;
+  --color-navy-950: #ffffff;
 
   --color-red-50: #2a1215;
   --color-red-100: #3d171b;
@@ -103,11 +118,11 @@
 
 /* Charts */
 .viz {
-  --chart-single: #2f4a73;
+  --chart-single: #3f3f46;
   color: var(--color-slate-600);
 }
 .dark .viz {
-  --chart-single: #8fa9da;
+  --chart-single: #d4d4d8;
 }
 .viz .single-series path,
 .viz .single-series rect {
@@ -161,3 +176,64 @@
 .recharts-tooltip-item {
   color: var(--color-slate-800) !important;
 }
+
+/* ---------------- Logo animation ---------------- */
+/* Outline draws, then bars slide in (orange first). Final state = static logo. */
+.logo-anim .logo-frame {
+  stroke-dasharray: 152;
+  stroke-dashoffset: 152;
+  animation: logo-draw 0.65s cubic-bezier(0.4, 0, 0.2, 1) 0.05s forwards;
+}
+.logo-anim .logo-bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: logo-bar 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.logo-anim .logo-bar-1 { animation-delay: 0.5s; }
+.logo-anim .logo-bar-2 { animation-delay: 0.62s; }
+.logo-anim .logo-bar-3 { animation-delay: 0.74s; }
+@keyframes logo-draw { to { stroke-dashoffset: 0; } }
+@keyframes logo-bar { to { transform: scaleX(1); } }
+
+/* Bars pulse while something is waiting (e.g. records queued offline). */
+.logo-busy .logo-bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: logo-pulse 1.2s ease-in-out infinite;
+}
+.logo-busy .logo-bar-2 { animation-delay: 0.15s; }
+.logo-busy .logo-bar-3 { animation-delay: 0.3s; }
+@keyframes logo-pulse { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.35); } }
+
+/* Wordmark: letters rise in; the "1" lands last and turns orange. */
+.wordmark-anim .wm-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: wm-in 0.35s ease-out forwards;
+}
+.wordmark-anim .wm-one {
+  color: currentColor;
+  animation: wm-in 0.35s ease-out forwards, wm-orange 0.4s ease-out 1.25s forwards;
+}
+@keyframes wm-in { to { opacity: 1; transform: none; } }
+@keyframes wm-orange { to { color: #f26b1d; } }
+
+/* Launch splash: shown once per session, never blocks taps. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
+  pointer-events: none;
+  animation: splash-out 0.35s ease-in 1.15s forwards;
+}
+.no-splash .splash { display: none; }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }

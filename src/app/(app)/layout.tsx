@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/shell/app-shell";
+import { LaunchSplash } from "@/components/shell/animated-logo";
 import { requireSession } from "@/server/auth/current";
 import { getActiveBatch } from "@/server/services/batches";
 
@@ -8,8 +9,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const session = await requireSession();
   const active = await getActiveBatch();
   return (
-    <AppShell activeBatchName={active?.name ?? null} userName={session.user.name}>
-      {children}
-    </AppShell>
+    <>
+      <LaunchSplash />
+      <AppShell activeBatchName={active?.name ?? null} userName={session.user.name}>
+        {children}
+      </AppShell>
+    </>
   );
 }

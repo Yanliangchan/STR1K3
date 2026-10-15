@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CloudOff, RefreshCw, Trash2 } from "lucide-react";
 import { createEntriesAction } from "@/app/actions/data";
 import { useToast } from "@/components/ui/toast";
+import { AnimatedLogo } from "./animated-logo";
 import { OUTBOX_EVENT, markOutboxError, readOutbox, removeFromOutbox, type OutboxItem } from "@/lib/outbox";
 
 /** Sends records saved offline as soon as the connection is back, and shows connection status. */
@@ -89,6 +90,7 @@ export function OutboxSync() {
       )}
       {waiting.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-navy-200 bg-navy-50 px-3 py-2 text-sm text-navy-900">
+          <AnimatedLogo mode="busy" className="h-5 w-5 shrink-0" />
           <span className="flex-1">
             {waiting.length} record {waiting.length === 1 ? "entry" : "entries"} waiting to send: {waiting.map((w) => w.summary).join("; ")}
             {needsLogin && " — sign in again to send."}

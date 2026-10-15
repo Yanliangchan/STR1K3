@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 // Validated categorical slots (CVD-safe adjacent pairs); single-series charts use navy.
 const SERIES = { nor: "#2a78d6", crow: "#eb6834", statements: "#1baf7a" };
-const SINGLE = "#2f4a73";
+const SINGLE = "#3f3f46";
 const AXIS = { fontSize: 12, fill: "currentColor" };
 const GRID = "currentColor";
 const withB = (href: string, b?: string | null) => (b ? `${href}${href.includes("?") ? "&" : "?"}b=${b}` : href);

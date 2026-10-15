@@ -18,13 +18,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#142036" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a101c" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },
   ],
 };
 
 // Applies "auto" before first paint so there is no flash of the wrong theme.
-const themeScript = `(function(){try{var m=window.matchMedia('(prefers-color-scheme: dark)');var a=function(){if(document.documentElement.dataset.theme==='auto'){document.documentElement.classList.toggle('dark',m.matches)}};a();m.addEventListener('change',a)}catch(e){}})();`;
+const themeScript = `(function(){try{if(sessionStorage.getItem('str1k3:splash')){document.documentElement.classList.add('no-splash')}else{sessionStorage.setItem('str1k3:splash','1')}}catch(e){}try{var m=window.matchMedia('(prefers-color-scheme: dark)');var a=function(){if(document.documentElement.dataset.theme==='auto'){document.documentElement.classList.toggle('dark',m.matches)}};a();m.addEventListener('change',a)}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
