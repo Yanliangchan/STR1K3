@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "start": "prisma migrate deploy && node scripts/bootstrap.mjs && next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
@@ -18,7 +18,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "start:web": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "predev": "prisma migrate deploy"
   },
   "engines": {
     "node": ">=20.18"

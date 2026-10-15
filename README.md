@@ -87,7 +87,8 @@ See `.env.example`.
 
 | Script | |
 |---|---|
-| `npm run dev` / `build` / `start` | Develop, build, serve |
+| `npm run dev` / `build` | Develop (applies pending migrations first) / build |
+| `npm run start` | Apply migrations, bootstrap admin, then serve (used in production) |
 | `npm run lint` / `typecheck` | ESLint / `tsc --noEmit` |
 | `npm run db:migrate` | Create/apply migrations in development |
 | `npm run db:deploy` | Apply migrations (production) |
@@ -148,11 +149,10 @@ Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a differ
    - `COOKIE_SECURE` = `true`
    - `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` (first deploy only; remove `ADMIN_PASSWORD` afterwards)
    - optionally `SESSION_IDLE_DAYS` / `SESSION_MAX_DAYS`
-3. Deploy. `railway.json` does the rest:
-   - builds with `npm run build`
-   - runs `prisma migrate deploy` and the idempotent admin bootstrap as a **pre-deploy** step
-   - starts with `npm run start` (binds `0.0.0.0:$PORT`)
-   - health-checks `/api/health`
+3. Deploy. `railway.json` builds with `npm run build` and starts with `npm run start`, which on every start:
+   - applies any pending database migrations (`prisma migrate deploy` — safe to repeat; already-applied migrations are skipped),
+   - creates the first administrator if no accounts exist (from `ADMIN_*`),
+   - then serves the app on `0.0.0.0:$PORT`. Railway health-checks `/api/health`.
 4. Generate a Railway domain (HTTPS), sign in with the bootstrap admin, set a new password, then:
    - add categories in **Settings**
    - create your first batch in **Batch management** (add bytes, then import or add cadets)
@@ -187,3 +187,7 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 - **Offline:** only *creating* NOR/CROW/statement records works offline (queued and sent later). Viewing records and other changes (reviews, corrections) need a connection.
 - **"Outstanding over time"** is rebuilt from the audit trail, so data written directly to the database outside the app is not reflected.
 - **A single configured time zone.**
+
+### Troubleshooting
+
+- **`The table public.LoginAttempt does not exist`** (or any missing table): the database has not been migrated. `npm run start` and `npm run dev` now apply migrations automatically; to do it by hand run `npx prisma migrate deploy` with the same `DATABASE_URL` the app uses. On Railway, check that the app's `DATABASE_URL` points at your Postgres service (`${{Postgres.DATABASE_URL}}`).
