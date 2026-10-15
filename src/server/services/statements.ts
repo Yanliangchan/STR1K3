@@ -1,10 +1,13 @@
 /**
- * Statement workflow. Statuses and allowed transitions:
- *   NOT_SUBMITTED    -> PENDING_REVIEW   (receipt recorded; creates version 1)
- *   PENDING_REVIEW   -> ACCEPTED | REWRITE_REQUIRED (review of latest version)
- *   REWRITE_REQUIRED -> PENDING_REVIEW   (rewrite received; creates a new version)
+ * Statement tracking. STR1K3 does not store statement content — it tracks
+ * whether each cadet has handed in their statement, by when, and the outcome.
+ *
+ * Statuses and allowed transitions:
+ *   NOT_SUBMITTED    -> PENDING_REVIEW   (hand-in recorded; creates submission 1)
+ *   PENDING_REVIEW   -> ACCEPTED | REWRITE_REQUIRED (rewrite sets a new deadline)
+ *   REWRITE_REQUIRED -> PENDING_REVIEW   (rewrite handed in; creates a new submission)
  *   ACCEPTED         -> PENDING_REVIEW | REWRITE_REQUIRED only via explicit reopen with a reason
- * Versions and reviews are append-only; nothing is overwritten.
+ * Submissions and reviews are append-only; nothing is overwritten.
  */
 import { z } from "zod";
 import type { Prisma, StatementStatus } from "@prisma/client";
@@ -13,11 +16,18 @@ import type { Actor } from "@/server/actor";
 import { diff, writeAudit } from "@/server/audit";
 import { conflict, invalid, notFound, readOnly } from "@/server/errors";
 import { id, isoDate, optionalText, parse, reason, requiredText } from "@/server/validation";
-import { parseISODate, startOfDayInTz, todayISO } from "@/lib/dates";
+import { dateOnlyISO, formatDeadline, parseISODate, startOfDayInTz, todayISO, toTimeInTz, toISODateInTz, zonedDateTime } from "@/lib/dates";
 import { statementStatusLabel, STATEMENT_STATUSES } from "@/lib/labels";
 
+const hhmm = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour).")
+  .optional()
+  .nullable()
+  .or(z.literal("").transform(() => null));
+
 export type StatementListQuery = {
-  status?: StatementStatus | "OUTSTANDING";
+  status?: StatementStatus | "OUTSTANDING" | "OVERDUE";
   byteId?: string;
   cadetId?: string;
   from?: string;
@@ -27,21 +37,28 @@ export type StatementListQuery = {
   occurrenceId?: string;
 };
 
+/** Overdue = still waiting on the cadet (not submitted / rewrite) and past the deadline. */
+export function overdueWhere(now = new Date()): Prisma.StatementWhereInput {
+  return { voided: false, status: { in: ["NOT_SUBMITTED", "REWRITE_REQUIRED"] }, dueAt: { lt: now } };
+}
+
 export function statementWhere(batchId: string, f: StatementListQuery): Prisma.StatementWhereInput {
   return {
     batchId,
     ...(f.includeVoided ? {} : { voided: false }),
     ...(f.status === "OUTSTANDING"
       ? { status: { in: ["NOT_SUBMITTED", "PENDING_REVIEW", "REWRITE_REQUIRED"] } }
-      : f.status
-        ? { status: f.status }
-        : {}),
+      : f.status === "OVERDUE"
+        ? overdueWhere()
+        : f.status
+          ? { status: f.status }
+          : {}),
     ...(f.cadetId ? { cadetId: f.cadetId } : {}),
     ...(f.byteId ? { cadet: { byteId: f.byteId } } : {}),
     ...(f.occurrenceId ? { occurrenceId: f.occurrenceId } : {}),
     ...(f.from || f.to
       ? {
-          requestedOn: {
+          issuedOn: {
             ...(f.from ? { gte: parseISODate(f.from) } : {}),
             ...(f.to ? { lte: parseISODate(f.to) } : {}),
           },
@@ -59,10 +76,10 @@ export function statementWhere(batchId: string, f: StatementListQuery): Prisma.S
 }
 
 const STATUS_ORDER: Record<StatementStatus, number> = {
-  PENDING_REVIEW: 0,
-  REWRITE_REQUIRED: 1,
-  NOT_SUBMITTED: 2,
-  ACCEPTED: 3,
+  NOT_SUBMITTED: 0,
+  REWRITE_REQUIRED: 0,
+  PENDING_REVIEW: 1,
+  ACCEPTED: 2,
 };
 
 export async function listStatements(batchId: string, f: StatementListQuery = {}, take = 300) {
@@ -73,13 +90,21 @@ export async function listStatements(batchId: string, f: StatementListQuery = {}
       include: {
         cadet: { include: { byte: true } },
         _count: { select: { versions: true } },
+        versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { receivedAt: true, dueAt: true } },
       },
-      orderBy: [{ updatedAt: "desc" }],
+      orderBy: [{ dueAt: "asc" }],
       take,
     }),
     prisma.statement.count({ where }),
   ]);
-  rows.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || b.updatedAt.getTime() - a.updatedAt.getTime());
+  // Waiting on cadets (soonest/overdue deadline first), then waiting on review, then accepted.
+  rows.sort((a, b) => {
+    const s = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+    if (s) return s;
+    if (a.status === "ACCEPTED") return b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (a.status === "PENDING_REVIEW") return (a.lastReceivedAt?.getTime() ?? 0) - (b.lastReceivedAt?.getTime() ?? 0);
+    return a.dueAt.getTime() - b.dueAt.getTime();
+  });
   return { rows, total };
 }
 
@@ -106,6 +131,8 @@ export async function getStatement(statementId: string, batchId?: string) {
   if (!s || (batchId && s.batchId !== batchId)) throw notFound("Statement");
   return s;
 }
+
+type Loaded = Awaited<ReturnType<typeof loadForWrite>>;
 
 async function loadForWrite(statementId: string, expectedStatus?: StatementStatus) {
   const s = await prisma.statement.findUnique({
@@ -138,36 +165,43 @@ async function moveStatus(
   if (res.count !== 1) throw conflict("This statement was updated elsewhere. Reload and try again.");
 }
 
+function deadlineFrom(date: string | null | undefined, time: string | null | undefined, field = "newDueDate") {
+  if (!date) throw invalid("Set a new deadline.", { [field]: "Set a new deadline." });
+  return zonedDateTime(date, time || "23:59");
+}
+
 const receiptSchema = z.object({
   statementId: id,
-  content: optionalText(50000),
   receivedOn: isoDate.optional(),
+  receivedTime: hhmm,
   expectedStatus: z.enum(STATEMENT_STATUSES as [StatementStatus, ...StatementStatus[]]).optional(),
 });
 
-/** Record that a statement (or a rewrite) has been received. Always lands in PENDING_REVIEW. */
+/** Record that a statement (or a rewrite) has been handed in. Always lands in PENDING_REVIEW. */
 export async function recordReceipt(actor: Actor, input: z.input<typeof receiptSchema>) {
   const data = parse(receiptSchema, input);
   const s = await loadForWrite(data.statementId, data.expectedStatus);
   if (s.status !== "NOT_SUBMITTED" && s.status !== "REWRITE_REQUIRED") {
-    throw conflict(`A submission cannot be recorded while the statement is "${statementStatusLabel[s.status]}".`);
+    throw conflict(`A hand-in cannot be recorded while the statement is "${statementStatusLabel[s.status]}".`);
   }
-  return prisma.$transaction((tx) => receiptTx(tx, actor, s, data.content, data.receivedOn));
+  const receivedAt = receivedAtFor(data.receivedOn, data.receivedTime);
+  return prisma.$transaction((tx) => receiptTx(tx, actor, s, receivedAt));
 }
 
-async function receiptTx(
-  tx: Tx,
-  actor: Actor,
-  s: { id: string; status: StatementStatus; batchId: string; cadetId: string; cadet: { name: string }; versions: { versionNumber: number }[] },
-  content: string | null | undefined,
-  receivedOn?: string,
-) {
-  const now = new Date();
-  const receivedAt = receivedOn ? receivedAtFor(receivedOn, now) : now;
+function receivedAtFor(day: string | undefined, time: string | null | undefined, now = new Date()) {
+  if (!day || (day === todayISO(now) && !time)) return now;
+  if (day > todayISO(now)) throw invalid("The hand-in date cannot be in the future.", { receivedOn: "Cannot be in the future." });
+  const at = time ? zonedDateTime(day, time) : new Date(startOfDayInTz(day).getTime() + 12 * 3600_000);
+  if (at > now) throw invalid("The hand-in time cannot be in the future.", { receivedTime: "Cannot be in the future." });
+  return at;
+}
+
+async function receiptTx(tx: Tx, actor: Actor, s: Loaded, receivedAt: Date) {
   const versionNumber = (s.versions[0]?.versionNumber ?? 0) + 1;
+  const late = receivedAt > s.dueAt;
   await moveStatus(tx, s, "PENDING_REVIEW", actor.id, { lastReceivedAt: receivedAt });
   const version = await tx.statementVersion.create({
-    data: { statementId: s.id, versionNumber, content: content ?? null, receivedAt, recordedById: actor.id },
+    data: { statementId: s.id, versionNumber, receivedAt, dueAt: s.dueAt, recordedById: actor.id },
   });
   await writeAudit(tx, {
     actorId: actor.id,
@@ -176,36 +210,22 @@ async function receiptTx(
     entityId: s.id,
     batchId: s.batchId,
     cadetId: s.cadetId,
-    summary:
-      versionNumber > 1
-        ? `Rewritten statement (version ${versionNumber}) received from ${s.cadet.name}`
-        : `Statement received from ${s.cadet.name}`,
-    changes: { status: { from: s.status, to: "PENDING_REVIEW" }, version: versionNumber },
+    summary: `${versionNumber > 1 ? `Rewrite (submission ${versionNumber})` : "Statement"} handed in by ${s.cadet.name}${late ? " — late" : ""}`,
+    changes: { status: { from: s.status, to: "PENDING_REVIEW" }, version: versionNumber, late },
   });
   return version;
 }
 
-function receivedAtFor(iso: string, now: Date) {
-  // If the receipt date is today, keep the exact time; otherwise use midday of that date.
-  if (iso === todayISO(now)) return now;
-  if (iso > todayISO(now)) throw invalid("The received date cannot be in the future.", { receivedOn: "Cannot be in the future." });
-  return new Date(startOfDayInTz(iso).getTime() + 12 * 3600 * 1000);
-}
+const reviewSchema = z.object({
+  statementId: id,
+  outcome: z.enum(["ACCEPTED", "REWRITE_REQUIRED"]),
+  feedback: optionalText(2000),
+  newDueDate: isoDate.optional().nullable(),
+  newDueTime: hhmm,
+  expectedVersion: z.number().int().positive().optional(),
+});
 
-const reviewSchema = z
-  .object({
-    statementId: id,
-    outcome: z.enum(["ACCEPTED", "REWRITE_REQUIRED"]),
-    feedback: optionalText(10000),
-    expectedVersion: z.number().int().positive().optional(),
-  })
-  .superRefine((v, ctx) => {
-    if (v.outcome === "REWRITE_REQUIRED" && !v.feedback) {
-      ctx.addIssue({ code: "custom", path: ["feedback"], message: "Explain what needs to be corrected." });
-    }
-  });
-
-/** Review the latest version of a statement that is pending review. */
+/** Review the latest submission of a statement that is pending review. */
 export async function reviewStatement(actor: Actor, input: z.input<typeof reviewSchema>) {
   const data = parse(reviewSchema, input);
   const s = await loadForWrite(data.statementId);
@@ -213,26 +233,31 @@ export async function reviewStatement(actor: Actor, input: z.input<typeof review
     throw conflict(`Only statements pending review can be reviewed (this one is "${statementStatusLabel[s.status]}").`);
   }
   const latest = s.versions[0];
-  if (!latest) throw conflict("No submission has been recorded for this statement.");
+  if (!latest) throw conflict("No hand-in has been recorded for this statement.");
   if (data.expectedVersion && latest.versionNumber !== data.expectedVersion) {
-    throw conflict("A newer version was recorded. Reload and review the latest version.");
+    throw conflict("A newer submission was recorded. Reload and review the latest one.");
   }
-  return prisma.$transaction((tx) => reviewTx(tx, actor, s, latest.id, latest.versionNumber, data.outcome, data.feedback));
+  const newDueAt = data.outcome === "REWRITE_REQUIRED" ? deadlineFrom(data.newDueDate, data.newDueTime) : null;
+  return prisma.$transaction((tx) => reviewTx(tx, actor, s, latest.id, latest.versionNumber, data.outcome, data.feedback, newDueAt));
 }
 
 async function reviewTx(
   tx: Tx,
   actor: Actor,
-  s: { id: string; status: StatementStatus; batchId: string; cadetId: string; cadet: { name: string } },
+  s: Loaded,
   versionId: string,
   versionNumber: number,
   outcome: "ACCEPTED" | "REWRITE_REQUIRED",
   feedback: string | null | undefined,
+  newDueAt: Date | null,
 ) {
   const now = new Date();
-  await moveStatus(tx, s, outcome, actor.id, { acceptedAt: outcome === "ACCEPTED" ? now : null });
+  await moveStatus(tx, s, outcome, actor.id, {
+    acceptedAt: outcome === "ACCEPTED" ? now : null,
+    ...(newDueAt ? { dueAt: newDueAt } : {}),
+  });
   const review = await tx.statementReview.create({
-    data: { statementId: s.id, versionId, outcome, feedback: feedback ?? null, reviewedById: actor.id, reviewedAt: now },
+    data: { statementId: s.id, versionId, outcome, feedback: feedback ?? null, newDueAt, reviewedById: actor.id, reviewedAt: now },
   });
   await writeAudit(tx, {
     actorId: actor.id,
@@ -243,34 +268,35 @@ async function reviewTx(
     cadetId: s.cadetId,
     summary:
       outcome === "ACCEPTED"
-        ? `Accepted statement (version ${versionNumber}) from ${s.cadet.name}`
-        : `Rewrite requested for ${s.cadet.name}'s statement (version ${versionNumber})`,
-    changes: { status: { from: s.status, to: outcome }, version: versionNumber },
+        ? `Accepted ${s.cadet.name}'s statement (submission ${versionNumber})`
+        : `Rewrite required from ${s.cadet.name} by ${formatDeadline(newDueAt!)}`,
+    changes: {
+      status: { from: s.status, to: outcome },
+      version: versionNumber,
+      ...(newDueAt ? { dueAt: { from: s.dueAt.toISOString(), to: newDueAt.toISOString() } } : {}),
+    },
   });
   return review;
 }
 
-const reopenSchema = z
-  .object({
-    statementId: id,
-    to: z.enum(["PENDING_REVIEW", "REWRITE_REQUIRED"]),
-    reason,
-    feedback: optionalText(10000),
-  })
-  .superRefine((v, ctx) => {
-    if (v.to === "REWRITE_REQUIRED" && !v.feedback) {
-      ctx.addIssue({ code: "custom", path: ["feedback"], message: "Explain what needs to be corrected." });
-    }
-  });
+const reopenSchema = z.object({
+  statementId: id,
+  to: z.enum(["PENDING_REVIEW", "REWRITE_REQUIRED"]),
+  reason,
+  feedback: optionalText(2000),
+  newDueDate: isoDate.optional().nullable(),
+  newDueTime: hhmm,
+});
 
 /** Reopen an accepted statement. Requires a recorded reason. */
 export async function reopenStatement(actor: Actor, input: z.input<typeof reopenSchema>) {
   const data = parse(reopenSchema, input);
   const s = await loadForWrite(data.statementId);
   if (s.status !== "ACCEPTED") throw conflict("Only accepted statements can be reopened.");
+  const newDueAt = data.to === "REWRITE_REQUIRED" ? deadlineFrom(data.newDueDate, data.newDueTime) : null;
   const latest = s.versions[0];
   return prisma.$transaction(async (tx) => {
-    await moveStatus(tx, s, data.to, actor.id, { acceptedAt: null });
+    await moveStatus(tx, s, data.to, actor.id, { acceptedAt: null, ...(newDueAt ? { dueAt: newDueAt } : {}) });
     if (data.to === "REWRITE_REQUIRED") {
       await tx.statementReview.create({
         data: {
@@ -278,6 +304,7 @@ export async function reopenStatement(actor: Actor, input: z.input<typeof reopen
           versionId: latest?.id ?? null,
           outcome: "REWRITE_REQUIRED",
           feedback: data.feedback ?? null,
+          newDueAt,
           reviewedById: actor.id,
         },
       });
@@ -290,7 +317,10 @@ export async function reopenStatement(actor: Actor, input: z.input<typeof reopen
       batchId: s.batchId,
       cadetId: s.cadetId,
       summary: `Reopened ${s.cadet.name}'s accepted statement (now ${statementStatusLabel[data.to]})`,
-      changes: { status: { from: "ACCEPTED", to: data.to } },
+      changes: {
+        status: { from: "ACCEPTED", to: data.to },
+        ...(newDueAt ? { dueAt: { from: s.dueAt.toISOString(), to: newDueAt.toISOString() } } : {}),
+      },
       reason: data.reason,
     });
   });
@@ -298,24 +328,29 @@ export async function reopenStatement(actor: Actor, input: z.input<typeof reopen
 
 const detailsSchema = z.object({
   statementId: id,
-  title: requiredText(4000, "Enter the statement description."),
-  instructions: optionalText(4000),
+  title: requiredText(500, "Enter the subject."),
   notes: optionalText(4000),
-  requestedOn: isoDate,
+  issuedOn: isoDate,
+  dueDate: isoDate,
+  dueTime: hhmm,
   reason,
 });
 
+/** Correct the subject, notes, issue date or deadline (e.g. grant an extension). */
 export async function updateStatementDetails(actor: Actor, input: z.input<typeof detailsSchema>) {
   const data = parse(detailsSchema, input);
+  if (data.dueDate < data.issuedOn) throw invalid("The deadline cannot be before the issue date.", { dueDate: "Before the issue date." });
   const s = await loadForWrite(data.statementId);
-  const before = { title: s.title, instructions: s.instructions, notes: s.notes, requestedOn: s.requestedOn.toISOString().slice(0, 10) };
-  const after = { title: data.title, instructions: data.instructions, notes: data.notes, requestedOn: data.requestedOn };
-  const changes = diff(before, after, ["title", "instructions", "notes", "requestedOn"]);
+  const dueAt = zonedDateTime(data.dueDate, data.dueTime || "23:59");
+  const fmt = (d: Date) => `${toISODateInTz(d)} ${toTimeInTz(d)}`;
+  const before = { title: s.title, notes: s.notes, issuedOn: dateOnlyISO(s.issuedOn), deadline: fmt(s.dueAt) };
+  const after = { title: data.title, notes: data.notes, issuedOn: data.issuedOn, deadline: fmt(dueAt) };
+  const changes = diff(before, after, ["title", "notes", "issuedOn", "deadline"]);
   if (!Object.keys(changes).length) return;
   await prisma.$transaction(async (tx) => {
     await tx.statement.update({
       where: { id: s.id },
-      data: { title: data.title, instructions: data.instructions, notes: data.notes, requestedOn: parseISODate(data.requestedOn), updatedById: actor.id },
+      data: { title: data.title, notes: data.notes, issuedOn: parseISODate(data.issuedOn), dueAt, updatedById: actor.id },
     });
     await writeAudit(tx, {
       actorId: actor.id,
@@ -324,7 +359,9 @@ export async function updateStatementDetails(actor: Actor, input: z.input<typeof
       entityId: s.id,
       batchId: s.batchId,
       cadetId: s.cadetId,
-      summary: `Corrected statement request details for ${s.cadet.name}`,
+      summary: changes.deadline && Object.keys(changes).length === 1
+        ? `Changed ${s.cadet.name}'s statement deadline to ${formatDeadline(dueAt)}`
+        : `Corrected statement details for ${s.cadet.name}`,
       changes,
       reason: data.reason,
     });
@@ -347,7 +384,7 @@ export async function voidStatement(actor: Actor, input: { statementId: string; 
       entityId: s.id,
       batchId: s.batchId,
       cadetId: s.cadetId,
-      summary: `Voided statement request for ${s.cadet.name}`,
+      summary: `Voided statement for ${s.cadet.name}`,
       changes: { voided: { from: false, to: true }, status: s.status },
       reason: data.reason,
     });
@@ -357,9 +394,11 @@ export async function voidStatement(actor: Actor, input: { statementId: string; 
 const bulkSchema = z.object({
   batchId: id,
   statementIds: z.array(id).min(1).max(500),
-  action: z.enum(["RECEIVE", "ACCEPT"]),
+  action: z.enum(["RECEIVE", "ACCEPT", "REWRITE"]),
   confirmCount: z.number().int(),
-  feedback: optionalText(10000),
+  feedback: optionalText(2000),
+  newDueDate: isoDate.optional().nullable(),
+  newDueTime: hhmm,
 });
 
 /**
@@ -370,6 +409,7 @@ export async function bulkStatementAction(actor: Actor, input: z.input<typeof bu
   const data = parse(bulkSchema, input);
   const ids = [...new Set(data.statementIds)];
   if (data.confirmCount !== ids.length) throw invalid("Confirmation count does not match the selection.");
+  const newDueAt = data.action === "REWRITE" ? deadlineFrom(data.newDueDate, data.newDueTime) : null;
   const rows = await prisma.statement.findMany({
     where: { id: { in: ids }, batchId: data.batchId },
     include: { batch: true, cadet: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
@@ -379,26 +419,27 @@ export async function bulkStatementAction(actor: Actor, input: z.input<typeof bu
   const allowed: StatementStatus[] = data.action === "RECEIVE" ? ["NOT_SUBMITTED", "REWRITE_REQUIRED"] : ["PENDING_REVIEW"];
   const bad = rows.filter((r) => r.voided || !allowed.includes(r.status));
   if (bad.length) {
+    const verb = data.action === "RECEIVE" ? "record hand-in for" : data.action === "ACCEPT" ? "accept" : "require a rewrite for";
     throw conflict(
-      `Cannot ${data.action === "RECEIVE" ? "record receipt for" : "accept"}: ${bad
-        .map((r) => `${r.cadet.name} (${r.voided ? "voided" : statementStatusLabel[r.status]})`)
-        .join(", ")}. Nothing was changed.`,
+      `Cannot ${verb}: ${bad.map((r) => `${r.cadet.name} (${r.voided ? "voided" : statementStatusLabel[r.status]})`).join(", ")}. Nothing was changed.`,
     );
   }
+  const now = new Date();
   await prisma.$transaction(async (tx) => {
     for (const s of rows) {
-      if (data.action === "RECEIVE") await receiptTx(tx, actor, s, null);
+      if (data.action === "RECEIVE") await receiptTx(tx, actor, s, now);
       else {
         const latest = s.versions[0]!;
-        await reviewTx(tx, actor, s, latest.id, latest.versionNumber, "ACCEPTED", data.feedback);
+        await reviewTx(tx, actor, s, latest.id, latest.versionNumber, data.action === "ACCEPT" ? "ACCEPTED" : "REWRITE_REQUIRED", data.feedback, newDueAt);
       }
     }
+    const label = { RECEIVE: "Recorded hand-in of", ACCEPT: "Accepted", REWRITE: "Required rewrites for" }[data.action];
     await writeAudit(tx, {
       actorId: actor.id,
-      action: data.action === "RECEIVE" ? "statement.bulk_received" : "statement.bulk_accepted",
+      action: `statement.bulk_${data.action.toLowerCase()}`,
       entityType: "Statement",
       batchId: data.batchId,
-      summary: `${data.action === "RECEIVE" ? "Recorded receipt of" : "Accepted"} ${rows.length} statements in one action`,
+      summary: `${label} ${rows.length} statements in one action`,
       changes: { ids, count: rows.length },
     });
   });

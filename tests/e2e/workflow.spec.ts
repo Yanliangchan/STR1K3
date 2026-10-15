@@ -46,9 +46,11 @@ test("definition of done: bulk statements, independent review, counts, persisten
   await page.getByTestId("create-record-for-selected").click();
   await page.getByText("Statement", { exact: true }).click();
   await expect(page.getByTestId("selected-cadets").locator("li")).toHaveCount(3);
-  await page.getByLabel("Statement required for").fill("E2E: account for your movements on Tuesday evening.");
+  await page.getByLabel("Subject").fill("E2E: movements on Tuesday evening");
+  await page.getByRole("button", { name: "+2 days" }).click();
   await page.getByTestId("review-entries").click();
   await expect(page.getByTestId("review-summary")).toContainText("3 individual statement requests will be created");
+  await expect(page.getByTestId("review-summary")).toContainText("Deadline:");
   await page.getByTestId("confirm-create").click();
   const success = page.getByTestId("entry-success");
   await expect(success).toContainText("3 statement requests created");
@@ -60,17 +62,19 @@ test("definition of done: bulk statements, independent review, counts, persisten
 
   // 7. Mark one Pending review.
   await page.goto(hrefs[0]!);
-  await page.getByLabel("Statement content").fill("I was in the study room.");
+  await expect(page.getByText(/Deadline .*due in/)).toBeVisible();
   await page.getByTestId("record-receipt").click();
   await expect(page.getByText("Pending review").first()).toBeVisible();
 
   // 8. Request a rewrite for another.
   await page.goto(hrefs[1]!);
   await page.getByTestId("record-receipt").click();
-  await page.getByTestId("request-rewrite").waitFor();
-  await page.getByLabel("Feedback to cadet").fill("Include times and witnesses.");
   await page.getByTestId("request-rewrite").click();
-  await expect(page.getByText("Record rewritten statement")).toBeVisible();
+  await page.getByRole("button", { name: "+1 week" }).click();
+  await page.getByLabel("Feedback").fill("No timings given");
+  await page.getByTestId("confirm-rewrite").click();
+  await expect(page.getByText("Waiting for rewrite")).toBeVisible();
+  await expect(page.getByText(/New deadline/)).toBeVisible();
 
   // 9. Accept a third.
   await page.goto(hrefs[2]!);
@@ -89,7 +93,7 @@ test("definition of done: bulk statements, independent review, counts, persisten
   await page.goto(hrefs[1]!);
   await page.getByRole("link", { name: names[1]! }).first().click();
   await expect(page.getByTestId("cadet-name")).toHaveText(names[1]!);
-  await expect(page.getByTestId("cadet-history")).toContainText("E2E: account for your movements");
+  await expect(page.getByTestId("cadet-history")).toContainText("E2E: movements on Tuesday evening");
   await expect(page.getByTestId("cadet-history")).toContainText("Rewrite required");
 
   // 12. Statistics render from real data.
@@ -126,8 +130,8 @@ test("definition of done: bulk statements, independent review, counts, persisten
 
   // 15. Audit history records the important changes.
   await page.goto("/activity");
-  await expect(page.getByText(/Accepted statement \(version 1\) from/).first()).toBeVisible();
-  await expect(page.getByText(/Rewrite requested for/).first()).toBeVisible();
+  await expect(page.getByText(/Accepted .*'s statement \(submission 1\)/).first()).toBeVisible();
+  await expect(page.getByText(/Rewrite required from .* by /).first()).toBeVisible();
   await expect(page.getByText(/Set 14\/26 MDST as the active batch/).first()).toBeVisible();
 });
 
@@ -135,11 +139,18 @@ test("bulk NOR creation and a safe correction", async ({ page }) => {
   await signIn(page);
   const norBefore = await count(page, "count-nor");
   await page.goto("/records/new?type=NOR");
-  await page.getByRole("button", { name: "Select cadets" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.locator("input[type=checkbox]").nth(1).check();
-  await dialog.locator("input[type=checkbox]").nth(2).check();
-  await dialog.getByRole("button", { name: "Done" }).click();
+  // Type-ahead picker: type part of a name, pick from the filtered dropdown.
+  const box = page.getByRole("combobox", { name: /cadet's name/ });
+  await box.fill("lee");
+  const options = page.getByRole("option");
+  await expect(options.first()).toBeVisible();
+  const firstName = (await options.first().innerText()).split("\n")[0]!.trim();
+  await options.first().click();
+  await expect(box).toHaveValue("");
+  await box.fill("tan");
+  await box.press("Enter"); // Enter picks the highlighted (first) match, never "add all"
+  await expect(page.getByTestId("selected-cadets").locator("li")).toHaveCount(2);
+  await expect(page.getByTestId("selected-cadets")).toContainText(firstName);
   await page.getByLabel("Category").selectOption({ label: "Turnout" });
   await page.getByLabel("Observation").fill("E2E: boots not polished at inspection.");
   await page.getByTestId("review-entries").click();
@@ -164,4 +175,40 @@ test("bulk NOR creation and a safe correction", async ({ page }) => {
 test("protected API rejects unauthenticated requests", async ({ request }) => {
   const res = await request.post("/api/export", { form: { batchId: "x", dataset: "records" }, headers: { origin: "http://localhost:3200" } });
   expect(res.status()).toBe(401);
+});
+
+test("home leads with outstanding statements and flagged cadets, with explanations", async ({ page }) => {
+  await signIn(page);
+  await expect(page.getByTestId("today-summary")).toContainText(/overdue|due|review|outstanding/);
+  const sections = await page.locator("main h2").allInnerTexts();
+  const idx = (t: string) => sections.findIndex((s) => s.toUpperCase().startsWith(t));
+  expect(idx("OUTSTANDING STATEMENTS")).toBeGreaterThanOrEqual(0);
+  expect(idx("OUTSTANDING STATEMENTS")).toBeLessThan(idx("CADETS FLAGGED"));
+  expect(idx("CADETS FLAGGED")).toBeLessThan(idx("WHAT THE DATA SAYS"));
+  await expect(page.getByTestId("outstanding-list").locator("li").first()).toContainText(/Overdue/);
+  await expect(page.getByTestId("flagged-list")).toContainText(/separate occurrences|statements requested|repeated/);
+  await expect(page.getByTestId("insights")).toContainText("Why it matters");
+});
+
+test("statement queue quick actions and overdue tab", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/statements?status=OVERDUE");
+  const rows = page.getByTestId("statement-queue").locator(":scope > li");
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(0);
+  await expect(rows.first()).toContainText("Overdue");
+  await rows.first().getByTestId("quick-receive").click();
+  await expect(rows).toHaveCount(before - 1);
+});
+
+test("returning from a cadet profile keeps the roster search", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/cadets");
+  await page.getByLabel("Search cadets").fill("Byte 2");
+  await expect(page).toHaveURL(/q=Byte/);
+  await page.locator("ul.md\\:hidden a").first().click();
+  await expect(page.getByTestId("cadet-name")).toBeVisible();
+  await page.getByRole("link", { name: "Roster" }).click();
+  await expect(page).toHaveURL(/q=Byte/);
+  await expect(page.getByLabel("Search cadets")).toHaveValue("Byte 2");
 });

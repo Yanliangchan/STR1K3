@@ -1,5 +1,5 @@
 import type { StatementStatus } from "@prisma/client";
-import { CheckCircle2, CircleDashed, Clock3, PenLine } from "lucide-react";
+import { AlarmClock, CheckCircle2, CircleDashed, Clock3, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { statementStatusLabel } from "@/lib/labels";
 
@@ -43,4 +43,13 @@ export function Badge({ children, tone = "slate", className }: { children: React
     green: "bg-emerald-100 text-emerald-800",
   };
   return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", tones[tone], className)}>{children}</span>;
+}
+
+export function OverdueBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-300", className)}>
+      <AlarmClock className="h-3.5 w-3.5" aria-hidden />
+      Overdue
+    </span>
+  );
 }

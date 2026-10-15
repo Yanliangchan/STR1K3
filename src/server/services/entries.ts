@@ -9,7 +9,7 @@ import type { Actor } from "@/server/actor";
 import { writeAudit, writeAuditMany, type AuditInput } from "@/server/audit";
 import { invalid, readOnly, translateDbError } from "@/server/errors";
 import { id, isoDate, optionalText, parse, requiredText } from "@/server/validation";
-import { parseISODate } from "@/lib/dates";
+import { parseISODate, zonedDateTime } from "@/lib/dates";
 import { recordTypeLabel } from "@/lib/labels";
 import { truncate } from "@/lib/utils";
 
@@ -19,8 +19,9 @@ export type EntryKind = (typeof ENTRY_KINDS)[number];
 const overrideSchema = z.object({
   description: optionalText(4000),
   notes: optionalText(4000),
-  instructions: optionalText(4000),
 });
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour).");
 
 export const createEntriesSchema = z
   .object({
@@ -39,7 +40,9 @@ export const createEntriesSchema = z
     description: requiredText(4000, "Enter a description."),
     notes: optionalText(4000),
     referenceNo: optionalText(100),
-    instructions: optionalText(4000),
+    /** Statements only: submission deadline (date + time in the app time zone). */
+    dueDate: isoDate.optional().nullable(),
+    dueTime: hhmm.optional().nullable().or(z.literal("").transform(() => null)),
     occurrence: z
       .discriminatedUnion("mode", [
         z.object({ mode: z.literal("none") }),
@@ -52,6 +55,10 @@ export const createEntriesSchema = z
   .superRefine((v, ctx) => {
     if (new Set(v.cadetIds).size !== v.cadetIds.length) {
       ctx.addIssue({ code: "custom", path: ["cadetIds"], message: "A cadet was selected twice." });
+    }
+    if (v.kind === "STATEMENT") {
+      if (!v.dueDate) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Set a submission deadline." });
+      else if (v.dueDate < v.date) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "The deadline cannot be before the issue date." });
     }
     for (const cid of Object.keys(v.overrides)) {
       if (!v.cadetIds.includes(cid)) {
@@ -106,6 +113,7 @@ export async function createEntries(actor: Actor, input: CreateEntriesInput): Pr
   }
 
   const date = parseISODate(data.date);
+  const dueAt = data.kind === "STATEMENT" && data.dueDate ? zonedDateTime(data.dueDate, data.dueTime || "23:59") : null;
   const label = recordTypeLabel[data.kind];
 
   try {
@@ -147,9 +155,9 @@ export async function createEntries(actor: Actor, input: CreateEntriesInput): Pr
               batchId: batch.id,
               cadetId,
               title: o?.description ?? data.description,
-              instructions: o?.instructions ?? data.instructions,
               notes: o?.notes ?? data.notes,
-              requestedOn: date,
+              issuedOn: date,
+              dueAt: dueAt!,
               occurrenceId,
               bulkOperationId: op.id,
               createdById: actor.id,
@@ -194,7 +202,11 @@ export async function createEntries(actor: Actor, input: CreateEntriesInput): Pr
             data.kind === "STATEMENT"
               ? `Statement requested from ${cadet.name}`
               : `${label} recorded for ${cadet.name}`,
-          changes: { bulk: isBulk, bulkOperationId: op.id, ...(data.kind === "STATEMENT" ? { status: { from: null, to: "NOT_SUBMITTED" } } : {}) },
+          changes: {
+            bulk: isBulk,
+            bulkOperationId: op.id,
+            ...(data.kind === "STATEMENT" ? { status: { from: null, to: "NOT_SUBMITTED" }, dueAt: dueAt!.toISOString() } : {}),
+          },
         });
       }
       await writeAuditMany(tx, audits);

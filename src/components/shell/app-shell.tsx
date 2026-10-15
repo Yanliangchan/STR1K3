@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -48,6 +48,11 @@ export function AppShell({
   userName: string;
 }) {
   const pathname = usePathname();
+  // Count in-app page views so "Back" links can safely use browser history.
+  useEffect(() => {
+    const w = window as unknown as { __str1k3Navs?: number };
+    w.__str1k3Navs = (w.__str1k3Navs ?? 0) + 1;
+  }, [pathname]);
   const moreActive = pathname === "/more" || secondary.some((s) => isActive(pathname, s.href)) || pathname.startsWith("/account");
 
   return (

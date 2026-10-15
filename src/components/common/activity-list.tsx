@@ -26,9 +26,9 @@ type Event = {
 };
 
 function iconFor(action: string) {
-  if (action.endsWith(".accepted") || action === "statement.bulk_accepted") return CheckCircle2;
-  if (action.endsWith("rewrite_requested")) return PenLine;
-  if (action.endsWith(".received") || action.endsWith(".resubmitted") || action.endsWith("bulk_received")) return Clock3;
+  if (action.endsWith(".accepted") || action === "statement.bulk_accept") return CheckCircle2;
+  if (action.endsWith("rewrite_requested") || action.endsWith("bulk_rewrite")) return PenLine;
+  if (action.endsWith(".received") || action.endsWith(".resubmitted") || action.endsWith("bulk_receive")) return Clock3;
   if (action.endsWith(".voided")) return Ban;
   if (action.endsWith(".corrected") || action.endsWith(".updated")) return FilePen;
   if (action.startsWith("statement.")) return FileText;

@@ -79,12 +79,16 @@ model LoginAttempt {
 // Singleton row (id = 1, enforced by a CHECK constraint). Holding the active
 // batch here means at most one batch can ever be active.
 model AppConfig {
-  id                  Int      @id @default(1)
-  activeBatchId       String?  @unique
-  activeBatch         Batch?   @relation("ActiveBatch", fields: [activeBatchId], references: [id], onDelete: Restrict)
-  recurringThreshold  Int      @default(3)
-  recurringWindowDays Int? // null = whole batch
-  updatedAt           DateTime @updatedAt
+  id                     Int      @id @default(1)
+  activeBatchId          String?  @unique
+  activeBatch            Batch?   @relation("ActiveBatch", fields: [activeBatchId], references: [id], onDelete: Restrict)
+  recurringThreshold     Int      @default(3)
+  recurringWindowDays    Int? // null = whole batch
+  /// Flag a cadet for review at this many distinct NOR/CROW occurrences in a batch.
+  flagRecordThreshold    Int      @default(3)
+  /// Flag a cadet for review at this many statements requested in a batch.
+  flagStatementThreshold Int      @default(3)
+  updatedAt              DateTime @updatedAt
 }
 
 enum RecordType {
@@ -283,11 +287,13 @@ model Statement {
   batch           Batch           @relation(fields: [batchId], references: [id], onDelete: Restrict)
   cadetId         String
   cadet           Cadet           @relation(fields: [cadetId, batchId], references: [id, batchId], onDelete: Restrict)
+  /// Subject: what the statement is about.
   title           String
-  instructions    String?
   notes           String?
   status          StatementStatus @default(NOT_SUBMITTED)
-  requestedOn     DateTime        @db.Date
+  issuedOn        DateTime        @db.Date
+  /// Current submission deadline. A rewrite sets a new one.
+  dueAt           DateTime
   lastReceivedAt  DateTime?
   acceptedAt      DateTime?
   occurrenceId    String?
@@ -310,6 +316,7 @@ model Statement {
   reviews  StatementReview[]
 
   @@index([batchId, status, voided])
+  @@index([batchId, dueAt])
   @@index([cadetId])
   @@index([occurrenceId])
 }
@@ -324,8 +331,9 @@ model StatementVersion {
   statementId   String
   statement     Statement @relation(fields: [statementId], references: [id], onDelete: Restrict)
   versionNumber Int
-  content       String?
   receivedAt    DateTime
+  /// Deadline that applied to this submission (to show late hand-ins).
+  dueAt         DateTime?
   recordedById  String
   recordedBy    User      @relation("VersionRecordedBy", fields: [recordedById], references: [id])
   createdAt     DateTime  @default(now())
@@ -345,6 +353,8 @@ model StatementReview {
   version      StatementVersion? @relation(fields: [versionId], references: [id], onDelete: Restrict)
   outcome      ReviewOutcome
   feedback     String?
+  /// New deadline set when a rewrite is required.
+  newDueAt     DateTime?
   reviewedAt   DateTime          @default(now())
   reviewedById String
   reviewedBy   User              @relation(fields: [reviewedById], references: [id])

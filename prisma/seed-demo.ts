@@ -70,17 +70,29 @@ async function main() {
     kind: "STATEMENT",
     cadetIds: cadets.slice(18, 23).map((c) => c.id),
     date: addDaysISO(today, -1),
-    description: "Account for the missing food items from the instructors' pantry on the evening of the field exercise.",
-    instructions: "Handwritten, one page, submit to duty instructor.",
+    description: "Missing food from the instructors' pantry (field exercise evening)",
+    dueDate: addDaysISO(today, 1),
+    dueTime: "22:00",
     occurrence: { mode: "new", title: "Instructors' pantry" },
   });
   const [s1, s2, s3, s4] = stmt.created;
-  await recordReceipt(actor, { statementId: s1!.id, content: "I was at the vehicle park from 1800 to 2000 and did not enter the pantry." });
-  await recordReceipt(actor, { statementId: s2!.id, content: "I don't know." });
-  await reviewStatement(actor, { statementId: s2!.id, outcome: "REWRITE_REQUIRED", feedback: "Give times and locations for the whole evening." });
-  await recordReceipt(actor, { statementId: s3!.id, content: "From 1830 I was in the study room with my byte mates until lights out." });
+  await recordReceipt(actor, { statementId: s1!.id });
+  await recordReceipt(actor, { statementId: s2!.id });
+  await reviewStatement(actor, { statementId: s2!.id, outcome: "REWRITE_REQUIRED", feedback: "No timings given", newDueDate: addDaysISO(today, 2), newDueTime: "22:00" });
+  await recordReceipt(actor, { statementId: s3!.id });
   await reviewStatement(actor, { statementId: s3!.id, outcome: "ACCEPTED" });
-  await recordReceipt(actor, { statementId: s4!.id, content: "I was on guard duty at the main gate from 1900." });
+  await recordReceipt(actor, { statementId: s4!.id });
+
+  await createEntries(actor, {
+    idempotencyKey: key(),
+    batchId: batch.id,
+    kind: "STATEMENT",
+    cadetIds: [cadets[10]!.id, cadets[11]!.id],
+    date: addDaysISO(today, -5),
+    dueDate: addDaysISO(today, -3),
+    dueTime: "22:00",
+    description: "Horseplay in the stairwell",
+  });
 
   await activateBatch(actor, { batchId: batch.id, confirmName: batch.name });
   console.log("Demo data loaded. Sign in as admin@example.com or instructor@example.com with password DemoPassword123!");

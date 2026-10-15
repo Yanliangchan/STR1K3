@@ -77,7 +77,7 @@ describe("archiving", () => {
   it("requires a carry-over note when statements are outstanding, then becomes read-only", async () => {
     const u = await makeUser();
     const a = await makeBatch(u, { name: "Old" });
-    await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "STATEMENT", cadetIds: [a.cadets[0]!.id], date: today(), description: "s" });
+    await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "STATEMENT", dueDate: "2099-01-01", cadetIds: [a.cadets[0]!.id], date: today(), description: "s" });
     await expect(archiveBatch(u, { batchId: a.batch.id, acknowledged: true })).rejects.toMatchObject({ code: "VALIDATION" });
     await archiveBatch(u, { batchId: a.batch.id, acknowledged: true, carryOverNote: "Handed to next course OIC" });
     expect(await prisma.statement.count({ where: { batchId: a.batch.id } })).toBe(1); // nothing deleted

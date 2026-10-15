@@ -18,11 +18,11 @@ describe("statistics", () => {
     const b = await makeBatch(u, { name: "B" });
     await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "NOR", cadetIds: a.cadets.slice(0, 3).map((c) => c.id), date: today(), description: "x" });
     await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "CROW", cadetIds: [a.cadets[0]!.id], date: today(), description: "x" });
-    const st = await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "STATEMENT", cadetIds: a.cadets.slice(0, 2).map((c) => c.id), date: today(), description: "x" });
+    const st = await createEntries(u, { idempotencyKey: key(), batchId: a.batch.id, kind: "STATEMENT", dueDate: "2099-01-01", cadetIds: a.cadets.slice(0, 2).map((c) => c.id), date: today(), description: "x" });
     await createEntries(u, { idempotencyKey: key(), batchId: b.batch.id, kind: "NOR", cadetIds: b.cadets.map((c) => c.id), date: today(), description: "x" });
-    await recordReceipt(u, { statementId: st.created[0]!.id, content: "1" });
-    await reviewStatement(u, { statementId: st.created[0]!.id, outcome: "REWRITE_REQUIRED", feedback: "f" });
-    await recordReceipt(u, { statementId: st.created[0]!.id, content: "2" });
+    await recordReceipt(u, { statementId: st.created[0]!.id });
+    await reviewStatement(u, { statementId: st.created[0]!.id, outcome: "REWRITE_REQUIRED", feedback: "f", newDueDate: "2099-01-02" });
+    await recordReceipt(u, { statementId: st.created[0]!.id });
 
     const c = await dashboardCounts(a.batch.id);
     expect(c).toMatchObject({ cadets: 5, nor: 3, crow: 1, statements: 2, pendingReview: 1, notSubmitted: 1 });

@@ -12,7 +12,8 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { buttonClasses } from "@/components/ui/button";
 import { StatementQueue } from "@/components/statements/statement-queue";
 import { batchHref, cn, pluralize } from "@/lib/utils";
-import { formatDateOnly, formatDateTime } from "@/lib/dates";
+import { dueRelative, formatDateOnly, formatDateTime, formatDeadline, todayISO } from "@/lib/dates";
+import { isOverdue } from "@/lib/statement-utils";
 import { isStatementStatus } from "@/lib/labels";
 
 export const metadata = { title: "Statements" };
@@ -25,8 +26,14 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
   const ctx = await resolveBatchContext(sp.b);
   if (!ctx) return <NoActiveBatch />;
   const statusParam = sp.status ?? "OUTSTANDING";
-  const status: StatementStatus | "OUTSTANDING" | undefined =
-    statusParam === "ALL" ? undefined : statusParam === "OUTSTANDING" ? "OUTSTANDING" : isStatementStatus(statusParam) ? statusParam : "OUTSTANDING";
+  const status: StatementStatus | "OUTSTANDING" | "OVERDUE" | undefined =
+    statusParam === "ALL"
+      ? undefined
+      : statusParam === "OUTSTANDING" || statusParam === "OVERDUE"
+        ? statusParam
+        : isStatementStatus(statusParam)
+          ? statusParam
+          : "OUTSTANDING";
   const from = sp.from && DATE_RE.test(sp.from) ? sp.from : undefined;
   const to = sp.to && DATE_RE.test(sp.to) ? sp.to : undefined;
   const [{ rows, total }, bytes, counts] = await Promise.all([
@@ -44,8 +51,10 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
     dashboardCounts(ctx.batch.id),
   ]);
 
+  const now = new Date();
   const tabs = [
     { value: "OUTSTANDING", label: "Outstanding", n: counts.outstanding },
+    { value: "OVERDUE", label: "Overdue", n: counts.overdue },
     { value: "PENDING_REVIEW", label: "Pending review", n: counts.pendingReview },
     { value: "REWRITE_REQUIRED", label: "Rewrite required", n: counts.rewriteRequired },
     { value: "NOT_SUBMITTED", label: "Not submitted", n: counts.notSubmitted },
@@ -105,7 +114,7 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
           </select>
         </FilterField>
         <div className="grid grid-cols-2 gap-2">
-          <FilterField label="Requested from">
+          <FilterField label="Issued from">
             <input name="from" type="date" defaultValue={from} className={filterControl} />
           </FilterField>
           <FilterField label="To">
@@ -124,21 +133,25 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
       </p>
       {rows.length === 0 ? (
         <EmptyState icon={<FileText className="h-10 w-10" />} title="No statements here">
-          {status === "OUTSTANDING" ? "There are no outstanding statements." : "Try another status or filter."}
+          {status === "OUTSTANDING" ? "There are no outstanding statements." : status === "OVERDUE" ? "Nothing is overdue." : "Try another status or filter."}
         </EmptyState>
       ) : (
         <StatementQueue
           batchId={ctx.batch.id}
           readOnly={ctx.readOnly}
+          today={todayISO()}
           rows={rows.map((s) => ({
             id: s.id,
             cadetName: s.cadet.name,
             byteName: s.cadet.byte?.name ?? null,
             title: s.title,
             status: s.status,
-            requestedOn: formatDateOnly(s.requestedOn),
+            issuedOn: formatDateOnly(s.issuedOn),
+            dueLabel: formatDeadline(s.dueAt),
+            dueRelative: dueRelative(s.dueAt, now),
+            overdue: isOverdue(s, now),
             receivedAt: s.lastReceivedAt ? formatDateTime(s.lastReceivedAt) : null,
-            updatedAt: formatDateTime(s.updatedAt),
+            lastLate: !!(s.versions[0]?.dueAt && s.versions[0].receivedAt > s.versions[0].dueAt),
             versions: s._count.versions,
             voided: s.voided,
           }))}

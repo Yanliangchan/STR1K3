@@ -29,7 +29,6 @@ export async function POST(req: NextRequest) {
       from: get("from"),
       to: get("to"),
       includeVoided: get("includeVoided") === "1",
-      includeContent: get("includeContent") === "1",
     });
     if (!parsed.success) return NextResponse.json({ error: "Invalid export filters" }, { status: 400 });
     const { csv, filename } = await buildExport(actor, parsed.data);

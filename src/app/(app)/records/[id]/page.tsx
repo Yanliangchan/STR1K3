@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { BackLink } from "@/components/common/back-link";
 import { prisma } from "@/lib/db";
 import { getRecord } from "@/server/services/records";
 import { listCategories } from "@/server/services/categories";
@@ -30,9 +30,9 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="space-y-5">
-      <Link href={`/cadets/${rec.cadetId}`} className="inline-flex min-h-11 items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" aria-hidden /> {rec.cadet.name}
-      </Link>
+      <BackLink href={`/cadets/${rec.cadetId}`}>
+        {rec.cadet.name}
+      </BackLink>
 
       {rec.status === "VOIDED" && (
         <Alert tone="error" title="This record has been voided">

@@ -5,7 +5,7 @@ import type { Actor } from "@/server/actor";
 import { writeAudit, writeAuditMany } from "@/server/audit";
 import { invalid } from "@/server/errors";
 import { parseCsv, toCsv } from "@/lib/csv";
-import { dateOnlyISO } from "@/lib/dates";
+import { dateOnlyISO, toISODateInTz, toTimeInTz } from "@/lib/dates";
 import { statementStatusLabel } from "@/lib/labels";
 import { assertBatchWritable, getBatch } from "./batches";
 import { recordWhere } from "./records";
@@ -164,7 +164,6 @@ export const exportSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   includeVoided: z.boolean().optional(),
-  includeContent: z.boolean().optional(),
 });
 export type ExportInput = z.infer<typeof exportSchema>;
 
@@ -215,21 +214,22 @@ export async function buildExport(actor: Actor, input: ExportInput) {
         versions: { orderBy: { versionNumber: "desc" }, take: 1 },
         reviews: { orderBy: { reviewedAt: "desc" }, take: 1 },
       },
-      orderBy: [{ requestedOn: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ issuedOn: "asc" }, { createdAt: "asc" }],
     });
     count = rows.length;
-    const header = ["Statement ID", "Batch", "Cadet", "Byte", "Description", "Instructions", "Status", "Requested on", "Last received", "Versions", "Latest feedback", "Occurrence", "Voided", "Created by", "Last updated"];
-    if (input.includeContent) header.push("Latest version content");
+    const now = new Date();
     csv = toCsv(
-      header,
+      ["Statement ID", "Batch", "Cadet", "Byte", "Subject", "Status", "Issued on", "Deadline", "Overdue", "Submissions", "Last handed in", "Last hand-in late", "Latest feedback", "Occurrence", "Notes", "Voided", "Created by", "Last updated"],
       rows.map((s) => {
-        const base: unknown[] = [
-          s.id, batch.name, s.cadet.name, s.cadet.byte?.name ?? "", s.title, s.instructions ?? "", statementStatusLabel[s.status],
-          dateOnlyISO(s.requestedOn), s.lastReceivedAt ?? "", s.versions[0]?.versionNumber ?? 0, s.reviews[0]?.feedback ?? "",
-          s.occurrence?.title ?? "", s.voided ? "Yes" : "No", s.createdBy.name, s.updatedAt,
+        const last = s.versions[0];
+        const overdue = !s.voided && (s.status === "NOT_SUBMITTED" || s.status === "REWRITE_REQUIRED") && s.dueAt < now;
+        return [
+          s.id, batch.name, s.cadet.name, s.cadet.byte?.name ?? "", s.title, statementStatusLabel[s.status],
+          dateOnlyISO(s.issuedOn), `${toISODateInTz(s.dueAt)} ${toTimeInTz(s.dueAt)}`, overdue ? "Yes" : "No",
+          last?.versionNumber ?? 0, last ? `${toISODateInTz(last.receivedAt)} ${toTimeInTz(last.receivedAt)}` : "",
+          last?.dueAt && last.receivedAt > last.dueAt ? "Yes" : last ? "No" : "", s.reviews[0]?.feedback ?? "",
+          s.occurrence?.title ?? "", s.notes ?? "", s.voided ? "Yes" : "No", s.createdBy.name, s.updatedAt,
         ];
-        if (input.includeContent) base.push(s.versions[0]?.content ?? "");
-        return base;
       }),
     );
   } else {
@@ -248,7 +248,7 @@ export async function buildExport(actor: Actor, input: ExportInput) {
     entityType: "Batch",
     entityId: batch.id,
     batchId: batch.id,
-    summary: `Exported ${count} ${input.dataset} rows to CSV${input.includeContent ? " (including statement content)" : ""}`,
+    summary: `Exported ${count} ${input.dataset} rows to CSV`,
     changes: { filters: input as unknown as Record<string, string> },
   });
   return { csv, filename: `str1k3-${safeName}-${input.dataset}-${stamp}.csv` };

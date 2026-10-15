@@ -78,3 +78,43 @@ export function addDaysISO(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return dateOnlyISO(d);
 }
+
+/** Absolute instant for a wall-clock date + "HH:MM" in the app time zone. */
+export function zonedDateTime(iso: string, hhmm: string): Date {
+  const [h, m] = hhmm.split(":").map(Number);
+  // Resolve the offset at that wall time (handles zones with DST).
+  const start = startOfDayInTz(iso);
+  const guess = new Date(start.getTime() + ((h ?? 0) * 60 + (m ?? 0)) * 60_000);
+  const check = toTimeInTz(guess);
+  if (check === hhmm) return guess;
+  const [ch, cm] = check.split(":").map(Number);
+  const drift = ((ch ?? 0) * 60 + (cm ?? 0) - ((h ?? 0) * 60 + (m ?? 0))) * 60_000;
+  return new Date(guess.getTime() - drift);
+}
+
+/** "HH:MM" of an instant in the app time zone. */
+export function toTimeInTz(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: env.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+}
+
+/** Short deadline label, e.g. "Thu 16 Oct, 23:59". */
+export function formatDeadline(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: env.timezone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(d).replace(" at ", ", ");
+}
+
+/** Human description of time until/since a deadline, e.g. "due in 5 h", "2 d overdue". */
+export function dueRelative(due: Date, now = new Date()): string {
+  const diff = due.getTime() - now.getTime();
+  const abs = Math.abs(diff);
+  const h = Math.round(abs / 3600_000);
+  const text = abs < 3600_000 ? `${Math.max(1, Math.round(abs / 60_000))} min` : h < 48 ? `${h} h` : `${Math.round(h / 24)} d`;
+  return diff >= 0 ? `due in ${text}` : `${text} overdue`;
+}

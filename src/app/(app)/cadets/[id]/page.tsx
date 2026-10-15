@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, FileText, Plus } from "lucide-react";
+import { BackLink } from "@/components/common/back-link";
+import { AlertTriangle, FileText, Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { orNotFound } from "@/server/context";
 import { getCadet, cadetCounts } from "@/server/services/cadets";
@@ -64,7 +65,8 @@ export default async function CadetPage({
     ...statements.map((s) => ({
       kind: "STATEMENT" as const,
       id: s.id,
-      date: s.requestedOn,
+      date: s.issuedOn,
+      dueAt: s.dueAt,
       category: null,
       description: s.title,
       status: s.status,
@@ -81,9 +83,9 @@ export default async function CadetPage({
 
   return (
     <div className="space-y-5">
-      <Link href={`/cadets${isActiveBatch ? "" : `?b=${cadet.batchId}`}`} className="inline-flex min-h-11 items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-        <ArrowLeft className="h-4 w-4" aria-hidden /> Roster
-      </Link>
+      <BackLink href={`/cadets${isActiveBatch ? "" : `?b=${cadet.batchId}`}`}>
+        Roster
+      </BackLink>
 
       {!isActiveBatch && (
         <Alert tone="warning">

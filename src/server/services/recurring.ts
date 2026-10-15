@@ -22,7 +22,12 @@ export type RecurringFlag = {
 
 export async function getRecurringConfig() {
   const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
-  return { threshold: cfg?.recurringThreshold ?? 3, windowDays: cfg?.recurringWindowDays ?? null };
+  return {
+    threshold: cfg?.recurringThreshold ?? 3,
+    windowDays: cfg?.recurringWindowDays ?? null,
+    flagRecordThreshold: cfg?.flagRecordThreshold ?? 3,
+    flagStatementThreshold: cfg?.flagStatementThreshold ?? 3,
+  };
 }
 
 /**
@@ -87,12 +92,14 @@ export async function recurringFlags(batchId: string, opts?: { cadetId?: string 
 
 export async function updateRecurringConfig(
   actor: { id: string },
-  input: { threshold: number; windowDays: number | null },
+  input: { threshold: number; windowDays: number | null; flagRecordThreshold?: number; flagStatementThreshold?: number },
 ) {
   const data = parse(
     z.object({
       threshold: z.coerce.number().int().min(2, "Minimum is 2.").max(50),
       windowDays: z.coerce.number().int().min(1).max(3650).nullable(),
+      flagRecordThreshold: z.coerce.number().int().min(1, "Minimum is 1.").max(100).optional(),
+      flagStatementThreshold: z.coerce.number().int().min(1, "Minimum is 1.").max(100).optional(),
     }),
     input,
   );
@@ -100,15 +107,25 @@ export async function updateRecurringConfig(
   await prisma.$transaction(async (tx) => {
     await tx.appConfig.upsert({
       where: { id: 1 },
-      update: { recurringThreshold: data.threshold, recurringWindowDays: data.windowDays },
+      update: {
+        recurringThreshold: data.threshold,
+        recurringWindowDays: data.windowDays,
+        ...(data.flagRecordThreshold ? { flagRecordThreshold: data.flagRecordThreshold } : {}),
+        ...(data.flagStatementThreshold ? { flagStatementThreshold: data.flagStatementThreshold } : {}),
+      },
       create: { id: 1, recurringThreshold: data.threshold, recurringWindowDays: data.windowDays },
     });
     await writeAudit(tx, {
       actorId: actor.id,
       action: "settings.recurring_updated",
       entityType: "AppConfig",
-      summary: `Changed recurring-issue flag to ${data.threshold} occurrences${data.windowDays ? ` within ${data.windowDays} days` : " per batch"}`,
-      changes: { threshold: { from: before.threshold, to: data.threshold }, windowDays: { from: before.windowDays, to: data.windowDays } },
+      summary: "Changed review flag thresholds",
+      changes: {
+        threshold: { from: before.threshold, to: data.threshold },
+        windowDays: { from: before.windowDays, to: data.windowDays },
+        flagRecordThreshold: { from: before.flagRecordThreshold, to: data.flagRecordThreshold ?? before.flagRecordThreshold },
+        flagStatementThreshold: { from: before.flagStatementThreshold, to: data.flagStatementThreshold ?? before.flagStatementThreshold },
+      },
     });
   });
 }

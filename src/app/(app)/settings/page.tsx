@@ -24,8 +24,8 @@ export default async function SettingsPage() {
         <CategoriesForm categories={categories.map((c) => ({ id: c.id, name: c.name, recordType: c.recordType, active: c.active }))} />
       </section>
       <section>
-        <SectionTitle>Recurring-issue flag</SectionTitle>
-        <RecurringForm threshold={recurring.threshold} windowDays={recurring.windowDays} />
+        <SectionTitle>Review flags</SectionTitle>
+        <RecurringForm {...recurring} />
       </section>
       <section>
         <SectionTitle>Instructor accounts</SectionTitle>

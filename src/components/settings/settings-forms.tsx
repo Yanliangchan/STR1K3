@@ -129,26 +129,58 @@ function CategoryRow({ c }: { c: Cat }) {
   );
 }
 
-export function RecurringForm({ threshold, windowDays }: { threshold: number; windowDays: number | null }) {
+export function RecurringForm({
+  threshold,
+  windowDays,
+  flagRecordThreshold,
+  flagStatementThreshold,
+}: {
+  threshold: number;
+  windowDays: number | null;
+  flagRecordThreshold: number;
+  flagStatementThreshold: number;
+}) {
   const { run, pending, error, fieldErrors } = useRun();
+  const [rec, setRec] = useState(String(flagRecordThreshold));
+  const [stm, setStm] = useState(String(flagStatementThreshold));
   const [t, setT] = useState(String(threshold));
   const [w, setW] = useState(windowDays ? String(windowDays) : "");
   return (
-    <Card className="space-y-3 p-4">
+    <Card className="space-y-4 p-4">
       {error && <Alert tone="error">{error}</Alert>}
       <p className="text-sm text-slate-600">
-        A cadet is flagged for review when they have this many distinct occurrences in the same NOR/CROW category. This is a
-        local review aid, not an official rule, and never creates records or triggers action.
+        Cadets who reach any of these are listed under <strong>Cadets flagged for review</strong> on Home. They are local review
+        prompts, not official rules, and never create records or trigger action.
       </p>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Distinct occurrences" error={fieldErrors.threshold}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Separate NOR/CROW occurrences" hint="Linked records from one event count once." error={fieldErrors.flagRecordThreshold}>
+          {(p) => <Input {...p} type="number" min={1} value={rec} onChange={(e) => setRec(e.target.value)} />}
+        </Field>
+        <Field label="Statements requested" error={fieldErrors.flagStatementThreshold}>
+          {(p) => <Input {...p} type="number" min={1} value={stm} onChange={(e) => setStm(e.target.value)} />}
+        </Field>
+        <Field label="Same category repeating" hint="Distinct occurrences in one category." error={fieldErrors.threshold}>
           {(p) => <Input {...p} type="number" min={2} value={t} onChange={(e) => setT(e.target.value)} />}
         </Field>
-        <Field label="Within (days)" hint="Blank = whole batch" error={fieldErrors.windowDays}>
+        <Field label="…within (days)" hint="Blank = whole batch" error={fieldErrors.windowDays}>
           {(p) => <Input {...p} type="number" min={1} value={w} onChange={(e) => setW(e.target.value)} />}
         </Field>
       </div>
-      <Button loading={pending} onClick={() => run(() => updateRecurringAction({ threshold: Number(t), windowDays: w ? Number(w) : null }), "Recurring-issue settings saved.")}>
+      <Button
+        loading={pending}
+        onClick={() =>
+          run(
+            () =>
+              updateRecurringAction({
+                threshold: Number(t),
+                windowDays: w ? Number(w) : null,
+                flagRecordThreshold: Number(rec),
+                flagStatementThreshold: Number(stm),
+              }),
+            "Review flag settings saved.",
+          )
+        }
+      >
         Save
       </Button>
     </Card>

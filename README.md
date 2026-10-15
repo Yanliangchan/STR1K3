@@ -16,11 +16,11 @@ Cadets have no accounts. Everything is entered by instructors.
 | **Active batch** | Exactly one active batch, stored in a database singleton with a unique constraint. The app always opens into it. Changing it is an explicit action: you type the batch name to confirm, and the change is audited. A new batch is never activated automatically. |
 | **Batch management** | Create and edit batches and bytes, add or remove cadets, assign bytes in bulk, transfer cadets between batches (old records stay with the original batch), import rosters from CSV, archive a batch (with a checklist and a carry-over note when work is outstanding), and reopen a batch (with a reason). |
 | **Roster** | Search by name, byte, or record and statement text. Filter by byte, NOR, CROW, outstanding, rewrite required or no records. Filters live in the URL, so **Back** keeps them. Multi-select supports select-all-shown and a sticky **Create record** bar. |
-| **Bulk / quick record form** | Choose NOR, CROW or Statement, pick one or more cadets, and enter the shared details once. Per-cadet adjustments are optional, and you can exclude a cadet before confirming. A review step shows: "5 cadets selected · Statement · 5 individual statement requests will be created". Creation runs in a **single transaction** with an **idempotency key**, so a double-tap or network retry never duplicates records. Drafts are saved on the device, and you are warned before leaving with unsaved changes. |
+| **Bulk / quick record form** | Choose NOR, CROW or Statement and pick cadets with a **type-to-filter box**: type part of a name or byte, then tap or use arrow keys and Enter. You can also add all matches or add a whole byte in one tap. Enter the shared details once. Per-cadet adjustments are optional, and you can exclude a cadet before confirming. A review step shows: "5 cadets selected · Statement · 5 individual statement requests will be created". Creation runs in a **single transaction** with an **idempotency key**, so a double-tap or network retry never duplicates records. Drafts are saved on the device, and you are warned before leaving with unsaved changes. |
 | **Shared occurrence** | Optional link between records that came from one event. Linked records count as one occurrence when detecting recurring issues. Never mandatory. |
-| **Statements** | Exactly four statuses: Not submitted → Pending review → Accepted / Rewrite required → (rewrite received) → Pending review. Every receipt creates a new **version**, and every review decision is a separate **review row**, so nothing is overwritten. An accepted statement can only be reopened with a recorded reason. Bulk "record receipt" and bulk "accept" (with explicit confirmation) are all-or-nothing. |
+| **Statements (tracking only)** | STR1K3 does **not** store what a cadet wrote. Each statement has a subject, optional notes, an **issue date** and a required **deadline** (date and time, default 23:59, with one-tap presets). Statuses: Not submitted → Pending review → Accepted / Rewrite required → (rewrite handed in) → Pending review. **Rewrite required always sets a new deadline**; feedback is optional. Every hand-in is logged with its time and marked **On time** or **Late** against the deadline that applied. Statements past their deadline are marked **Overdue**. Extensions go through *Edit / extend deadline*, with a reason. The queue has one-tap **Handed in / Accept / Rewrite** buttons on each row, plus confirmed bulk versions of the same actions. Reopening an accepted statement requires a reason. |
 | **Corrections** | NORs, CROWs and statement requests can be corrected with a mandatory reason; the before/after values are kept in the audit trail. Records can be **voided** (kept, but excluded from counts). There is no hard delete anywhere in the UI, and the database blocks deletes. |
-| **Dashboard** | Live counts for cadets, NORs, CROWs, statements, pending review, rewrite required, not submitted and accepted. Each card opens the filtered list. Also shows quick actions, a "needs attention" list and recent activity (statement content is never shown). |
+| **Dashboard** | Built around what needs doing, in this order:<br>1. A one-line summary (e.g. "2 overdue · 1 due within 24 h · 2 waiting for your review").<br>2. **Outstanding statements, grouped by cadet**: overdue first, then due soon, then waiting on you.<br>3. **Cadets flagged for review**: N+ separate NOR/CROW occurrences, N+ statements, or the same category repeating, each with a plain-language reason. Thresholds are configurable and flags are ordered by recent activity, not by count.<br>4. **What the data says**: findings that each state *why it matters*, such as overdue rate, review backlog age, late hand-in rate, rewrite rate, week-on-week trend, a dominant category, or a byte with a higher rate per cadet. A finding is only shown when there is enough data for it to mean something.<br>5. Batch totals and latest changes. |
 | **Statistics** | Record distribution, statement status, records by byte (NOR/CROW toggle), categories, activity over time, and outstanding statements over time (rebuilt from the audit trail). Filters: batch, byte, type, category, status and date range. Every chart has a data-table view and links through to the filtered list. |
 | **Recurring issues** | Flags a cadet with ≥ N distinct occurrences in the same NOR/CROW category (default 3; configurable, optionally within a day window). Shared occurrences count once. Unlinked records on the same date are flagged for **manual review** rather than counted as separate occurrences. Statements never count. Flags never create records or trigger action. |
 | **Audit** | Append-only audit table: a database trigger rejects UPDATE and DELETE. It records the actor, time, entity, batch, cadet, a summary, a before/after diff and a reason. Browse it on the **Activity history** page. |
@@ -105,20 +105,23 @@ npm run build && E2E_DATABASE_URL=postgresql://user:pass@localhost:5432/str1k3_e
 
 Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a different Chromium binary.
 
-**Integration tests (42)** cover:
+**Integration tests (48)** cover:
 - passwords, sign-in, rate limiting, session renewal, idle and absolute expiry, logout and revocation, deactivation, and admin-only account management
 - single active batch, explicit switching, new batches starting empty, and historical isolation
 - rejection of cross-batch writes at both the service and database level
 - archive rules, read-only archived batches, reopening and transfers
 - bulk creation (one cadet, many cadets, shared fields, overrides, idempotent sequential and concurrent retries, all-or-nothing behaviour, validation)
 - corrections with diffs, and voiding
-- all four statement statuses with independence between cadets, versioning, invalid transitions, reopen and bulk accept
+- all four statement statuses with independence between cadets, submissions history, invalid transitions, reopen and bulk accept
+- required deadlines (stored in the configured time zone), new deadlines on rewrite, overdue counts and late hand-ins
+- dashboard ordering (overdue first), flagged-cadet thresholds and reasons (shared occurrences count once), and insights shown only with enough data
 - dashboard counts against the database, statistics filters, and recurring flags without double counting
 - append-only audit, no hard deletes, CSV formula injection, export scoping, and CSV import validation
 
-**End-to-end tests (3, mobile viewport)** cover:
+**End-to-end tests (6, mobile viewport)** cover:
 - the full Definition of Done workflow: sign in, land on the active batch, search and multi-select cadets, bulk-create statements, take three statements down independent paths (pending review, rewrite, accepted), check dashboard counts, cadet history and statistics, sign out and back in, switch the active batch and back, and check the activity history
-- bulk NOR creation with a correction that keeps the previous value
+- bulk NOR creation using the type-ahead picker, with a correction that keeps the previous value
+- the dashboard section order and explanations, the Overdue tab with one-tap "Handed in", and the roster search surviving Back from a cadet profile
 - unauthenticated API rejection
 
 ---
@@ -164,8 +167,8 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 - **No self-service password reset by email.** No email service is configured; an administrator resets passwords instead.
 - **No file attachments** (by design). Statement content, notes and evidence descriptions are stored as text in Postgres.
 - **All instructors have equal access to all batches.** There are no per-batch assignments. Only *instructor account management* is restricted to administrators.
-- **Statement content cannot be edited after receipt.** Record a corrected submission through the rewrite workflow instead; this keeps every version.
-- **Per-cadet overrides in bulk entry** cover description, notes and instructions. Category, date and time are shared across the selection, and each record can be corrected individually afterwards.
+- **Statement text is not stored** (by design). Only the tracking details are kept: subject, dates, deadlines, hand-ins, outcomes and feedback.
+- **Per-cadet overrides in bulk entry** cover description/subject and notes. Category, dates and the deadline are shared across the selection; each one can be changed individually afterwards (deadline via *Edit / extend deadline*).
 - **Long lists are capped** rather than paginated: the newest 200 records and 300 statements per view, and 50 entries per page in the activity history. Filters narrow the lists.
 - **Notifications** appear in the in-app activity feed only (no push or email).
 - **Offline:** there is no offline queue. The new-record form keeps an unsent draft on the device and retries safely when the connection returns.

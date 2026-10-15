@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Search, UserPlus, X } from "lucide-react";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 import { createEntriesAction } from "@/app/actions/data";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { CadetCombobox } from "@/components/cadets/cadet-combobox";
+import { DeadlineInput } from "@/components/statements/deadline-input";
 import { Alert, Card } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/dialog";
 import { TypeBadge } from "@/components/ui/badges";
@@ -15,7 +17,7 @@ import { cn, pluralize } from "@/lib/utils";
 
 type Kind = "NOR" | "CROW" | "STATEMENT";
 type Cadet = { id: string; name: string; byteName: string | null };
-type Override = { description?: string; notes?: string; instructions?: string };
+type Override = { description?: string; notes?: string };
 
 type FormState = {
   kind: Kind;
@@ -24,7 +26,8 @@ type FormState = {
   time: string;
   categoryId: string;
   description: string;
-  instructions: string;
+  dueDate: string;
+  dueTime: string;
   notes: string;
   referenceNo: string;
   occurrenceMode: "none" | "new" | "existing";
@@ -51,8 +54,8 @@ const KIND_COPY: Record<Kind, { title: string; descLabel: string; descHint: stri
   },
   STATEMENT: {
     title: "Statement",
-    descLabel: "Statement required for",
-    descHint: "E.g. “Explain your whereabouts at 1900h on 14 Oct.” A statement request is not a finding of wrongdoing.",
+    descLabel: "Subject",
+    descHint: "What the statement is about, e.g. “Missing food from instructors’ pantry”. A statement request is not a finding of wrongdoing.",
     unit: "statement request",
   },
 };
@@ -63,6 +66,12 @@ function newKey() {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function addDays(iso: string, n: number) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 function blank(kind: Kind, cadetIds: string[], today: string): FormState {
   return {
     kind,
@@ -71,7 +80,8 @@ function blank(kind: Kind, cadetIds: string[], today: string): FormState {
     time: "",
     categoryId: "",
     description: "",
-    instructions: "",
+    dueDate: addDays(today, 1),
+    dueTime: "23:59",
     notes: "",
     referenceNo: "",
     occurrenceMode: cadetIds.length > 1 ? "new" : "none",
@@ -103,13 +113,12 @@ export function EntryForm({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const draftKey = `str1k3:draft:${batch.id}`;
+  const draftKey = `str1k3:draft:v2:${batch.id}`;
   const [s, setS] = useState<FormState>(() => blank(initialKind, initialCadetIds, today));
   const [dirty, setDirty] = useState(false);
   const [draftNotice, setDraftNotice] = useState<null | "restored" | "available">(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<{ message: string; code?: string } | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<Success | null>(null);
@@ -208,6 +217,10 @@ export function EntryForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) e.date = "Enter a valid date.";
     if (s.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)) e.time = "Use HH:MM (24-hour).";
     if (s.occurrenceMode === "existing" && !s.occurrenceId) e.occurrence = "Choose an occurrence.";
+    if (s.kind === "STATEMENT") {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) e.dueDate = "Set a submission deadline.";
+      else if (s.dueDate < s.date) e.dueDate = "The deadline cannot be before the issue date.";
+    }
     return e;
   }
 
@@ -233,8 +246,8 @@ export function EntryForm({
     const clean = (v?: string) => (v && v.trim() ? v.trim() : undefined);
     const overrides: Record<string, Override> = {};
     for (const [id, o] of Object.entries(s.overrides)) {
-      const c = { description: clean(o.description), notes: clean(o.notes), instructions: clean(o.instructions) };
-      if (c.description || c.notes || c.instructions) overrides[id] = c;
+      const c = { description: clean(o.description), notes: clean(o.notes) };
+      if (c.description || c.notes) overrides[id] = c;
     }
     try {
       const res = await createEntriesAction({
@@ -248,7 +261,8 @@ export function EntryForm({
         description: s.description,
         notes: s.notes,
         referenceNo: s.kind === "STATEMENT" ? null : s.referenceNo,
-        instructions: s.kind === "STATEMENT" ? s.instructions : null,
+        dueDate: s.kind === "STATEMENT" ? s.dueDate : null,
+        dueTime: s.kind === "STATEMENT" ? s.dueTime : null,
         occurrence:
           s.occurrenceMode === "new"
             ? { mode: "new", title: s.occurrenceTitle }
@@ -394,46 +408,11 @@ export function EntryForm({
 
       {/* Cadets */}
       <section aria-labelledby="cadets-h" className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 id="cadets-h" className="text-sm font-medium text-slate-800">
-            Cadets <span className="text-red-700" aria-hidden>*</span>
-            <span className="ml-2 font-normal text-slate-500">{selected.length} selected</span>
-          </h2>
-          <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
-            <UserPlus className="h-4 w-4" aria-hidden /> {selected.length ? "Change" : "Select cadets"}
-          </Button>
-        </div>
-        {selected.length > 0 ? (
-          <ul className="flex flex-wrap gap-2" data-testid="selected-cadets">
-            {selected.map((c) => (
-              <li key={c.id} className="inline-flex items-center gap-1 rounded-full bg-navy-50 py-1 pl-3 pr-1 text-sm text-navy-900 ring-1 ring-inset ring-navy-100">
-                <span>
-                  {c.name}
-                  {c.byteName && <span className="text-navy-600"> · {c.byteName}</span>}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => update({ cadetIds: s.cadetIds.filter((x) => x !== c.id) })}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-navy-100"
-                  aria-label={`Remove ${c.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className={cn(
-              "flex min-h-14 w-full items-center justify-center rounded-xl border border-dashed text-sm",
-              errors.cadetIds ? "border-red-400 text-red-700" : "border-slate-300 text-slate-600 hover:bg-white",
-            )}
-          >
-            Tap to select one or more cadets
-          </button>
-        )}
+        <h2 id="cadets-h" className="text-sm font-medium text-slate-800">
+          Cadets <span className="text-red-700" aria-hidden>*</span>
+          <span className="ml-2 font-normal text-slate-500">{selected.length} selected</span>
+        </h2>
+        <CadetCombobox roster={roster} selected={s.cadetIds} onChange={(ids) => update({ cadetIds: ids })} error={errors.cadetIds} />
         {errors.cadetIds && (
           <p className="text-sm font-medium text-red-700" role="alert">
             {errors.cadetIds}
@@ -444,7 +423,7 @@ export function EntryForm({
       {/* Shared details */}
       <Card className="space-y-4 p-4">
         <div className="grid grid-cols-2 gap-3">
-          <Field label={s.kind === "STATEMENT" ? "Date requested" : "Date of occurrence"} required error={errors.date}>
+          <Field label={s.kind === "STATEMENT" ? "Issue date" : "Date of occurrence"} required error={errors.date}>
             {(p) => <Input {...p} type="date" value={s.date} max={today} onChange={(e) => update({ date: e.target.value })} />}
           </Field>
           {s.kind !== "STATEMENT" ? (
@@ -484,9 +463,15 @@ export function EntryForm({
         </Field>
 
         {s.kind === "STATEMENT" && (
-          <Field label="Instructions to cadets" hint="Format, deadline or what to cover. Optional." error={errors.instructions}>
-            {(p) => <Textarea {...p} rows={2} value={s.instructions} onChange={(e) => update({ instructions: e.target.value })} maxLength={4000} />}
-          </Field>
+          <DeadlineInput
+            label="Submission deadline"
+            today={today}
+            min={s.date}
+            date={s.dueDate}
+            time={s.dueTime}
+            error={errors.dueDate}
+            onChange={(v) => update({ dueDate: v.date, dueTime: v.time })}
+          />
         )}
 
         <Field label="Instructor notes" hint="Optional. Internal notes." error={errors.notes}>
@@ -560,7 +545,7 @@ export function EntryForm({
             <span>
               Adjust individual cadets
               <span className="ml-2 font-normal text-slate-500">
-                {Object.values(s.overrides).filter((o) => o.description || o.notes || o.instructions).length || "none"} adjusted
+                {Object.values(s.overrides).filter((o) => o.description || o.notes).length || "none"} adjusted
               </span>
             </span>
             <ChevronDown className={cn("h-5 w-5 transition-transform", showOverrides && "rotate-180")} aria-hidden />
@@ -573,11 +558,6 @@ export function EntryForm({
                   <Field label={`${copy.descLabel} (leave blank to use shared)`}>
                     {(p) => <Textarea {...p} rows={2} value={s.overrides[c.id]?.description ?? ""} onChange={(e) => setOverride(c.id, "description", e.target.value)} placeholder={s.description} />}
                   </Field>
-                  {s.kind === "STATEMENT" && (
-                    <Field label="Individual instructions">
-                      {(p) => <Textarea {...p} rows={2} value={s.overrides[c.id]?.instructions ?? ""} onChange={(e) => setOverride(c.id, "instructions", e.target.value)} placeholder={s.instructions} />}
-                    </Field>
-                  )}
                   <Field label="Individual notes">
                     {(p) => <Textarea {...p} rows={2} value={s.overrides[c.id]?.notes ?? ""} onChange={(e) => setOverride(c.id, "notes", e.target.value)} placeholder={s.notes} />}
                   </Field>
@@ -602,14 +582,6 @@ export function EntryForm({
           </Button>
         </div>
       </div>
-
-      <CadetPicker
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        roster={roster}
-        selected={s.cadetIds}
-        onChange={(ids) => update({ cadetIds: ids })}
-      />
 
       <Dialog
         open={reviewOpen}
@@ -640,6 +612,11 @@ export function EntryForm({
               {selected.length === 1 ? "" : "s"} will be created.
             </li>
           </ul>
+          {s.kind === "STATEMENT" && (
+            <p>
+              <span className="font-medium text-slate-800">Deadline:</span> {s.dueDate} {s.dueTime || "23:59"}
+            </p>
+          )}
           <div>
             <p className="font-medium text-slate-800">{copy.descLabel}</p>
             <p className="whitespace-pre-wrap text-slate-700">{s.description}</p>
@@ -670,83 +647,5 @@ export function EntryForm({
         </div>
       </Dialog>
     </form>
-  );
-}
-
-function CadetPicker({
-  open,
-  onOpenChange,
-  roster,
-  selected,
-  onChange,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  roster: Cadet[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-}) {
-  const [q, setQ] = useState("");
-  const [byte, setByte] = useState("");
-  const bytes = [...new Set(roster.map((c) => c.byteName).filter(Boolean))] as string[];
-  const shown = roster.filter(
-    (c) =>
-      (!q || c.name.toLowerCase().includes(q.toLowerCase()) || (c.byteName ?? "").toLowerCase().includes(q.toLowerCase())) &&
-      (!byte || c.byteName === byte),
-  );
-  const set = new Set(selected);
-  const allShown = shown.length > 0 && shown.every((c) => set.has(c.id));
-  function toggle(id: string) {
-    const n = new Set(set);
-    if (n.has(id)) n.delete(id);
-    else n.add(id);
-    onChange(roster.filter((c) => n.has(c.id)).map((c) => c.id));
-  }
-  function toggleShown() {
-    const n = new Set(set);
-    shown.forEach((c) => (allShown ? n.delete(c.id) : n.add(c.id)));
-    onChange(roster.filter((c) => n.has(c.id)).map((c) => c.id));
-  }
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Select cadets"
-      description={`${selected.length} selected`}
-      footer={<Button onClick={() => onOpenChange(false)}>Done</Button>}
-    >
-      <div className="space-y-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden />
-          <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or byte" aria-label="Search cadets" className="pl-10" />
-        </div>
-        {bytes.length > 0 && (
-          <Select aria-label="Filter by byte" value={byte} onChange={(e) => setByte(e.target.value)}>
-            <option value="">All bytes</option>
-            {bytes.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </Select>
-        )}
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-slate-100 text-sm font-medium text-slate-700">
-          <Checkbox checked={allShown} onChange={toggleShown} disabled={shown.length === 0} />
-          {allShown ? "Clear" : "Select"} all {shown.length} shown
-        </label>
-        <ul className="max-h-[50dvh] overflow-y-auto">
-          {shown.map((c) => (
-            <li key={c.id}>
-              <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-1 hover:bg-slate-50">
-                <Checkbox checked={set.has(c.id)} onChange={() => toggle(c.id)} />
-                <span className="flex-1 text-sm text-slate-900">{c.name}</span>
-                <span className="text-xs text-slate-500">{c.byteName ?? "No byte"}</span>
-              </label>
-            </li>
-          ))}
-          {shown.length === 0 && <li className="py-6 text-center text-sm text-slate-500">No cadets match.</li>}
-        </ul>
-      </div>
-    </Dialog>
   );
 }

@@ -35,7 +35,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         prisma.statement.findMany({
           where: { batchId: ctx.batch.id, title: { contains: q, mode: "insensitive" } },
           include: { cadet: { include: { byte: true } }, createdBy: { select: { name: true } } },
-          orderBy: { requestedOn: "desc" },
+          orderBy: { issuedOn: "desc" },
           take: 20,
         }),
       ])
@@ -92,7 +92,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             <ul className="divide-y divide-slate-100">
               {statements.map((s) => (
                 <li key={s.id}>
-                  <HistoryItem showCadet e={{ kind: "STATEMENT", id: s.id, date: s.requestedOn, category: null, description: s.title, status: s.status, voided: s.voided, createdBy: s.createdBy.name, updatedAt: s.updatedAt, cadetName: s.cadet.name, byteName: s.cadet.byte?.name }} />
+                  <HistoryItem showCadet e={{ kind: "STATEMENT", id: s.id, date: s.issuedOn, category: null, description: s.title, status: s.status, voided: s.voided, createdBy: s.createdBy.name, updatedAt: s.updatedAt, cadetName: s.cadet.name, byteName: s.cadet.byte?.name }} />
                 </li>
               ))}
             </ul>

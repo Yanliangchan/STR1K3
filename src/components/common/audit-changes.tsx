@@ -10,9 +10,9 @@ const LABELS: Record<string, string> = {
   description: "Description",
   notes: "Notes",
   referenceNo: "Reference",
-  title: "Description",
-  instructions: "Instructions",
-  requestedOn: "Date requested",
+  title: "Subject",
+  issuedOn: "Issue date",
+  deadline: "Deadline",
 };
 
 /** Shows before/after values for correction events (field-level audit detail). */

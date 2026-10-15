@@ -103,9 +103,6 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
             <label className="flex min-h-11 items-center gap-2 text-sm">
               <input type="checkbox" name="includeVoided" value="1" className="h-5 w-5 accent-navy-700" /> Include voided entries
             </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input type="checkbox" name="includeContent" value="1" className="h-5 w-5 accent-navy-700" /> Include statement content (sensitive)
-            </label>
             <div className="sm:col-span-2">
               <button type="submit" className={buttonClasses("primary")}>
                 Download CSV

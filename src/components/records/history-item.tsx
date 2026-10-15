@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { StatementStatus } from "@prisma/client";
 import { ChevronRight } from "lucide-react";
-import { Badge, StatusBadge, TypeBadge } from "@/components/ui/badges";
-import { formatDateOnly, formatDateTime } from "@/lib/dates";
+import { Badge, OverdueBadge, StatusBadge, TypeBadge } from "@/components/ui/badges";
+import { awaitingCadet, isOverdue } from "@/lib/statement-utils";
+import { formatDateOnly, formatDateTime, formatDeadline } from "@/lib/dates";
 import { truncate } from "@/lib/utils";
 
 export type HistoryEntry = {
@@ -12,6 +13,8 @@ export type HistoryEntry = {
   category: string | null;
   description: string;
   status: StatementStatus | null;
+  /** Statements only: current deadline. */
+  dueAt?: Date;
   voided: boolean;
   createdBy: string;
   updatedAt: Date;
@@ -30,6 +33,7 @@ export function HistoryItem({ e, showCadet = false }: { e: HistoryEntry; showCad
           {e.category && <span className="text-sm text-slate-600">· {e.category}</span>}
           {e.voided && <Badge tone="red">Voided</Badge>}
           {e.status && !e.voided && <StatusBadge status={e.status} />}
+          {e.status && e.dueAt && isOverdue({ status: e.status, voided: e.voided, dueAt: e.dueAt }) && <OverdueBadge />}
         </div>
         {showCadet && (
           <p className="text-sm font-medium text-slate-900">
@@ -38,6 +42,9 @@ export function HistoryItem({ e, showCadet = false }: { e: HistoryEntry; showCad
           </p>
         )}
         <p className={e.voided ? "text-sm text-slate-500 line-through" : "text-sm text-slate-700"}>{truncate(e.description, 160)}</p>
+        {e.status && e.dueAt && !e.voided && awaitingCadet(e.status) && (
+          <p className="text-xs font-medium text-slate-700">Deadline {formatDeadline(e.dueAt)}</p>
+        )}
         <p className="text-xs text-slate-500">
           By {e.createdBy} · updated {formatDateTime(e.updatedAt)}
         </p>

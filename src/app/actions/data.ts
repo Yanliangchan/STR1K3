@@ -103,7 +103,7 @@ export async function createCategoryAction(input: Parameters<typeof categories.c
 export async function updateCategoryAction(input: Parameters<typeof categories.updateCategory>[1]) {
   return authed(async ({ actor }) => done(void (await categories.updateCategory(actor, input))));
 }
-export async function updateRecurringAction(input: { threshold: number; windowDays: number | null }) {
+export async function updateRecurringAction(input: Parameters<typeof updateRecurringConfig>[1]) {
   return authed(async ({ actor }) => done(void (await updateRecurringConfig(actor, input))));
 }
 export async function createUserAction(input: Parameters<typeof users.createUser>[1]) {

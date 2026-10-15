@@ -2,12 +2,14 @@ import type { Prisma, RecordType, StatementStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { addDaysISO, dateOnlyISO, parseISODate, startOfDayInTz, todayISO, toISODateInTz } from "@/lib/dates";
 import { OUTSTANDING_STATUSES, STATEMENT_STATUSES } from "@/lib/labels";
+import { overdueWhere } from "./statements";
 
 export async function dashboardCounts(batchId: string) {
-  const [cadets, records, statements] = await Promise.all([
+  const [cadets, records, statements, overdue] = await Promise.all([
     prisma.cadet.count({ where: { batchId, status: "ACTIVE" } }),
     prisma.record.groupBy({ by: ["type"], where: { batchId, status: "ACTIVE" }, _count: true }),
     prisma.statement.groupBy({ by: ["status"], where: { batchId, voided: false }, _count: true }),
+    prisma.statement.count({ where: { batchId, ...overdueWhere() } }),
   ]);
   const byType = Object.fromEntries(records.map((r) => [r.type, r._count])) as Partial<Record<RecordType, number>>;
   const byStatus = Object.fromEntries(statements.map((s) => [s.status, s._count])) as Partial<Record<StatementStatus, number>>;
@@ -21,6 +23,7 @@ export async function dashboardCounts(batchId: string) {
     pendingReview: byStatus.PENDING_REVIEW ?? 0,
     rewriteRequired: byStatus.REWRITE_REQUIRED ?? 0,
     accepted: byStatus.ACCEPTED ?? 0,
+    overdue,
     outstanding: OUTSTANDING_STATUSES.reduce((n, st) => n + (byStatus[st] ?? 0), 0),
   };
 }
@@ -34,7 +37,7 @@ export type StatsFilters = {
   to?: string;
 };
 
-function dateRange(field: "occurredOn" | "requestedOn", f: StatsFilters) {
+function dateRange(field: "occurredOn" | "issuedOn", f: StatsFilters) {
   if (!f.from && !f.to) return {};
   return {
     [field]: {
@@ -60,7 +63,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
     voided: false,
     ...(f.byteId ? { cadet: { byteId: f.byteId === "none" ? null : f.byteId } } : {}),
     ...(f.status ? { status: f.status } : {}),
-    ...dateRange("requestedOn", f),
+    ...dateRange("issuedOn", f),
   };
 
   const [records, statements, bytes, categories] = await Promise.all([
@@ -73,7 +76,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
     includeStatements
       ? prisma.statement.findMany({
           where: statementWhere,
-          select: { id: true, status: true, requestedOn: true, cadet: { select: { byteId: true } } },
+          select: { id: true, status: true, issuedOn: true, cadet: { select: { byteId: true } } },
         })
       : Promise.resolve([]),
     prisma.byte.findMany({ where: { batchId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
@@ -120,7 +123,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
   // Activity over time (by occurrence / request date).
   const allDates = [
     ...records.map((r) => dateOnlyISO(r.occurredOn)),
-    ...statements.map((s) => dateOnlyISO(s.requestedOn)),
+    ...statements.map((s) => dateOnlyISO(s.issuedOn)),
   ].sort();
   const end = f.to ?? todayISO();
   const start = f.from ?? (allDates[0] && allDates[0] < addDaysISO(end, -29) ? allDates[0] : addDaysISO(end, -29));
@@ -137,7 +140,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
     if (b) b[r.type === "NOR" ? "nor" : "crow"]++;
   }
   for (const s of statements) {
-    const b = buckets.get(bucketOf(dateOnlyISO(s.requestedOn)));
+    const b = buckets.get(bucketOf(dateOnlyISO(s.issuedOn)));
     if (b) b.statements++;
   }
   const activity = { granularity: weekly ? ("week" as const) : ("day" as const), points: [...buckets.values()] };

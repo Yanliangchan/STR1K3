@@ -52,7 +52,7 @@ describe("bulk record creation", () => {
   it("a retried submission with the same key does not duplicate (sequential and concurrent)", async () => {
     const u = await makeUser();
     const { batch, cadets } = await makeBatch(u);
-    const input = { idempotencyKey: key(), batchId: batch.id, kind: "STATEMENT" as const, cadetIds: cadets.map((c) => c.id), date: today(), description: "Explain" };
+    const input = { idempotencyKey: key(), batchId: batch.id, kind: "STATEMENT" as const, dueDate: "2099-01-01", cadetIds: cadets.map((c) => c.id), date: today(), description: "Explain" };
     const [a, b] = await Promise.all([createEntries(u, input), createEntries(u, input)]);
     const c = await createEntries(u, input);
     expect(await prisma.statement.count()).toBe(5);
