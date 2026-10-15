@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, FileText } from "lucide-react";
 import { createEntriesAction } from "@/app/actions/data";

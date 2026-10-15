@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ClipboardList, Plus } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
 import { listRecords } from "@/server/services/records";

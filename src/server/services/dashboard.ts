@@ -4,6 +4,7 @@
  */
 import type { StatementStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "./config";
 import { addDaysISO, parseISODate, todayISO } from "@/lib/dates";
 import { recurringFlags } from "./recurring";
 
@@ -76,7 +77,7 @@ export type FlaggedCadet = {
  * recent activity (not by count) so the list is a review queue, not a ranking.
  */
 export async function flaggedCadets(batchId: string): Promise<{ cadets: FlaggedCadet[]; recordThreshold: number; statementThreshold: number }> {
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
+  const cfg = await getAppConfig();
   const recordThreshold = cfg?.flagRecordThreshold ?? 3;
   const statementThreshold = cfg?.flagStatementThreshold ?? 3;
   const [records, statements, repeat] = await Promise.all([

@@ -78,6 +78,7 @@ See `.env.example`.
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_POOL_SIZE` | Optional. Database connections per server (default 5) |
 | `APP_TIMEZONE` | Time zone used for display and for "today" (default `Asia/Singapore`) |
 | `SESSION_IDLE_DAYS` / `SESSION_MAX_DAYS` | Session policy (default 7 / 30) |
 | `COOKIE_SECURE` | `true` in production (HTTPS). `false` only for local http |
@@ -187,6 +188,16 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 - **Offline:** only *creating* NOR/CROW/statement records works offline (queued and sent later). Viewing records and other changes (reviews, corrections) need a connection.
 - **"Outstanding over time"** is rebuilt from the audit trail, so data written directly to the database outside the app is not reflected.
 - **A single configured time zone.**
+
+### Performance & resource use
+
+- **No link prefetching.** Every page is per-user and dynamic, so links fetch on tap rather than rendering every visible link in the background.
+- **Fewer database round trips.** Related rows are joined in one query (Prisma `relationJoins`), and the app config / active batch are loaded once per page.
+- **Small connection pool** (5 by default). Change it with `DATABASE_POOL_SIZE`, or put `connection_limit` in `DATABASE_URL`.
+- **Housekeeping.** Expired sessions and sign-in attempts older than 30 days are deleted at start-up and at most every 6 hours. Records, statements and the audit log are never pruned.
+- **Caching.** Responses are gzip-compressed, build assets are immutable-cached, and icons are cached for a week.
+- **Profiling.** Set `STR1K3_LOG_QUERIES=1` to log every SQL query with its duration.
+- **Memory.** A Next.js server idles at about 240 MB RSS. On a small Railway plan you can cap the heap with `NODE_OPTIONS=--max-old-space-size=256`.
 
 ### Troubleshooting
 

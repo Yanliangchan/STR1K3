@@ -1,6 +1,7 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BackLink } from "@/components/common/back-link";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "@/server/services/config";
 import { getRecord } from "@/server/services/records";
 import { listCategories } from "@/server/services/categories";
 import { orNotFound } from "@/server/context";
@@ -25,7 +26,7 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
     }),
   ]);
   const editable = rec.batch.status === "OPEN" && rec.status === "ACTIVE";
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
+  const cfg = await getAppConfig();
   const bParam = cfg?.activeBatchId === rec.batchId ? "" : `&b=${rec.batchId}`;
 
   return (

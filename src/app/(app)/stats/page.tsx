@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { AlertTriangle } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
 import { statistics, type StatsFilters } from "@/server/services/stats";

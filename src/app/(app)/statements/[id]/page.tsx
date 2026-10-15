@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BackLink } from "@/components/common/back-link";
 import { prisma } from "@/lib/db";
 import { getStatement } from "@/server/services/statements";

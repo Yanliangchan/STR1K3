@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Search } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { resolveBatchContext } from "@/server/context";

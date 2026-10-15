@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, FileText, Info, Plus, TrendingUp } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
 import { dashboardCounts, recentActivity } from "@/server/services/stats";
@@ -71,7 +71,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-6">
       <BatchBanner ctx={ctx} />
-      {ctx.isActive && <SetupChecklist />}
+      {ctx.isActive && counts.cadets === 0 && <SetupChecklist />}
       <h1 className="sr-only">{ctx.batch.name} dashboard</h1>
       <SearchTrigger />
 

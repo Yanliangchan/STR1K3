@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { SlidersHorizontal } from "lucide-react";
 import { buttonClasses } from "@/components/ui/button";
 

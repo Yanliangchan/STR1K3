@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getActiveBatch } from "@/server/services/batches";

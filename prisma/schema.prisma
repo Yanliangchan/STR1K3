@@ -5,8 +5,10 @@
 // and with database triggers defined in the initial migration.
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  // Load included relations with SQL joins (one round trip) instead of extra queries.
+  previewFeatures = ["relationJoins"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -59,6 +61,8 @@ model Session {
   ip         String?
 
   @@index([userId])
+  @@index([expiresAt])
+  @@index([lastSeenAt])
 }
 
 model LoginAttempt {
@@ -70,6 +74,7 @@ model LoginAttempt {
 
   @@index([email, createdAt])
   @@index([ip, createdAt])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------

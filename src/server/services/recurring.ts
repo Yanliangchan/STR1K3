@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "./config";
 import { writeAudit } from "@/server/audit";
 import { parse } from "@/server/validation";
 import { addDaysISO, dateOnlyISO, parseISODate, todayISO } from "@/lib/dates";
@@ -21,7 +22,7 @@ export type RecurringFlag = {
 };
 
 export async function getRecurringConfig() {
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
+  const cfg = await getAppConfig();
   return {
     threshold: cfg?.recurringThreshold ?? 3,
     windowDays: cfg?.recurringWindowDays ?? null,

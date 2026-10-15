@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useState } from "react";
 import { Archive, ArrowRightLeft, CheckCircle2, Pencil, Plus, RotateCcw, Trash2, Upload, UserMinus, UserPlus } from "lucide-react";
 import {

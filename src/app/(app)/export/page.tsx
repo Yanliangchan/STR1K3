@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Upload } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
 import { listBatches } from "@/server/services/batches";

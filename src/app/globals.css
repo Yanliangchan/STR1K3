@@ -239,7 +239,7 @@
   background: var(--color-slate-50);
   color: var(--color-slate-900);
   pointer-events: none;
-  animation: splash-out 0.35s ease-in 1.15s forwards;
+  animation: splash-out 0.25s ease-in 0.75s forwards;
 }
 .no-splash .splash { display: none; }
 @keyframes splash-out { to { opacity: 0; visibility: hidden; } }

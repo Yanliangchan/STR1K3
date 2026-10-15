@@ -3,6 +3,7 @@ import { AppError } from "@/server/errors";
 import { getDummyHash, verifyPassword } from "./password";
 import { createSession } from "./session";
 import { writeAudit } from "@/server/audit";
+import { maybeRunMaintenance } from "@/server/services/maintenance";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILURES_PER_EMAIL = 5;
@@ -37,6 +38,7 @@ export async function login(
   }
 
   const session = await createSession(user.id, meta);
+  maybeRunMaintenance();
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await writeAudit(prisma, {
     actorId: user.id,

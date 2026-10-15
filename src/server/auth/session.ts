@@ -82,11 +82,3 @@ export async function revokeAllSessions(userId: string, exceptSessionId?: string
     where: { userId, ...(exceptSessionId ? { id: { not: exceptSessionId } } : {}) },
   });
 }
-
-export async function purgeExpiredSessions(now = new Date()) {
-  await prisma.session.deleteMany({
-    where: {
-      OR: [{ expiresAt: { lte: now } }, { lastSeenAt: { lt: new Date(now.getTime() - env.sessionIdleDays * DAY_MS) } }],
-    },
-  });
-}

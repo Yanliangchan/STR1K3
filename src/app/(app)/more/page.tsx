@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Activity, BarChart3, ChevronRight, Download, FolderCog, LogOut, Settings, UserCircle } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { requireSession } from "@/server/auth/current";

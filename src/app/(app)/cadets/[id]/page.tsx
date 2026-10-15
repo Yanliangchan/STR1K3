@@ -1,7 +1,8 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BackLink } from "@/components/common/back-link";
 import { AlertTriangle, FileText, Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "@/server/services/config";
 import { orNotFound } from "@/server/context";
 import { getCadet, cadetCounts } from "@/server/services/cadets";
 import { recurringFlags } from "@/server/services/recurring";
@@ -34,7 +35,7 @@ export default async function CadetPage({
   const { id } = await params;
   const sp = await searchParams;
   const cadet = await orNotFound(getCadet(id));
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
+  const cfg = await getAppConfig();
   const isActiveBatch = cfg?.activeBatchId === cadet.batchId;
   const readOnly = cadet.batch.status !== "OPEN";
   const ctxParam = isActiveBatch ? "" : `&b=${cadet.batchId}`;

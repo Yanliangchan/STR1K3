@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Archive, History } from "lucide-react";
 import type { BatchContext } from "@/server/context";
 

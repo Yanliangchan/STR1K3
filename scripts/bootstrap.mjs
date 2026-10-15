@@ -12,8 +12,21 @@ function hashPassword(password) {
   return `scrypt$${N}$${r}$${p}$${salt.toString("base64")}$${key.toString("base64")}`;
 }
 
+async function housekeeping() {
+  // Same rules as src/server/services/maintenance.ts: expired sessions and
+  // sign-in attempts older than 30 days. Records and the audit log are untouched.
+  const idleDays = Number.parseInt(process.env.SESSION_IDLE_DAYS ?? "", 10) || 7;
+  const now = Date.now();
+  const s = await prisma.session.deleteMany({
+    where: { OR: [{ expiresAt: { lte: new Date(now) } }, { lastSeenAt: { lt: new Date(now - idleDays * 86400000) } }] },
+  });
+  const a = await prisma.loginAttempt.deleteMany({ where: { createdAt: { lt: new Date(now - 30 * 86400000) } } });
+  if (s.count || a.count) console.log(`[bootstrap] housekeeping: removed ${s.count} expired sessions, ${a.count} old sign-in attempts.`);
+}
+
 async function main() {
   await prisma.appConfig.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  await housekeeping();
   const count = await prisma.user.count();
   if (count > 0) {
     console.log(`[bootstrap] ${count} instructor account(s) exist — nothing to do.`);

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import type { StatementStatus } from "@prisma/client";
 import { ChevronRight } from "lucide-react";
 import { Badge, OverdueBadge, StatusBadge, TypeBadge } from "@/components/ui/badges";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ChevronRight, FolderCog, Plus } from "lucide-react";
 import { listBatches } from "@/server/services/batches";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/ui/misc";

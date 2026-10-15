@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "./config";
 import type { Actor } from "@/server/actor";
 import { writeAudit, diff } from "@/server/audit";
 import { conflict, invalid, notFound, readOnly, translateDbError } from "@/server/errors";
@@ -7,7 +8,7 @@ import { id, optionalText, parse, reason, requiredText } from "@/server/validati
 import { OUTSTANDING_STATUSES } from "@/lib/labels";
 
 export async function getActiveBatch() {
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 }, include: { activeBatch: true } });
+  const cfg = await getAppConfig();
   return cfg?.activeBatch ?? null;
 }
 
@@ -27,7 +28,7 @@ export async function assertBatchWritable(batchId: string) {
 export async function listBatches() {
   const [batches, cfg, cadetCounts] = await Promise.all([
     prisma.batch.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }], include: { bytes: true } }),
-    prisma.appConfig.findUnique({ where: { id: 1 } }),
+    getAppConfig(),
     prisma.cadet.groupBy({ by: ["batchId"], where: { status: "ACTIVE" }, _count: true }),
   ]);
   const counts = new Map(cadetCounts.map((c) => [c.batchId, c._count]));
@@ -156,7 +157,7 @@ export async function activateBatch(actor: Actor, input: { batchId: string; conf
 
 export async function getArchiveChecklist(batchId: string) {
   const batch = await getBatch(batchId);
-  const cfg = await prisma.appConfig.findUnique({ where: { id: 1 } });
+  const cfg = await getAppConfig();
   const grouped = await prisma.statement.groupBy({
     by: ["status"],
     where: { batchId, voided: false, status: { in: OUTSTANDING_STATUSES } },
