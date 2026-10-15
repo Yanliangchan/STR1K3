@@ -6,6 +6,7 @@ import { Card, PageHeader, SectionTitle } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badges";
 import { PasswordForm } from "@/components/auth/password-form";
 import { SignOutOthers } from "@/components/settings/sign-out-others";
+import { ThemeSwitcher } from "@/components/settings/theme-switcher";
 import { formatDateTime } from "@/lib/dates";
 import { env } from "@/lib/env";
 
@@ -24,6 +25,13 @@ export default async function AccountPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Account" description={`${session.user.name} · ${session.user.email}`} />
+      <section>
+        <SectionTitle>Appearance</SectionTitle>
+        <Card className="space-y-2 p-4">
+          <ThemeSwitcher />
+          <p className="text-sm text-slate-500">Auto follows your phone or computer setting. Saved on this device.</p>
+        </Card>
+      </section>
       <section>
         <SectionTitle>Change password</SectionTitle>
         <Card className="p-4">

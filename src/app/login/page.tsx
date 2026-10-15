@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="mt-3 text-2xl font-bold tracking-[0.2em] text-navy-900">STR1K3</h1>
           <p className="mt-1 text-sm text-slate-600">Instructor records — NORs, CROWs and statements</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm sm:p-6">
           <LoginForm next={sp.next} notice={notice} />
         </div>
         <p className="mt-6 text-center text-xs text-slate-500">Authorised instructors only. Activity is recorded.</p>

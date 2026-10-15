@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function Card({ className, children, ...rest }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("rounded-xl border border-slate-200 bg-white", className)} {...rest}>
+    <div className={cn("rounded-xl border border-slate-200 bg-surface", className)} {...rest}>
       {children}
     </div>
   );
@@ -35,7 +35,7 @@ export function PageHeader({ title, description, actions }: { title: ReactNode; 
 
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-surface px-6 py-10 text-center">
       {icon && <div className="mb-3 text-slate-400">{icon}</div>}
       <p className="font-medium text-slate-800">{title}</p>
       {children && <div className="mt-1 max-w-md text-sm text-slate-600">{children}</div>}

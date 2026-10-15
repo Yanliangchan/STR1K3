@@ -211,8 +211,8 @@ export async function buildExport(actor: Actor, input: ExportInput) {
         cadet: { include: { byte: true } },
         occurrence: true,
         createdBy: true,
-        versions: { orderBy: { versionNumber: "desc" }, take: 1 },
-        reviews: { orderBy: { reviewedAt: "desc" }, take: 1 },
+        versions: { where: { retractedAt: null }, orderBy: { versionNumber: "desc" }, take: 1 },
+        reviews: { where: { retractedAt: null }, orderBy: { reviewedAt: "desc" }, take: 1 },
       },
       orderBy: [{ issuedOn: "asc" }, { createdAt: "asc" }],
     });

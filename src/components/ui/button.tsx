@@ -10,11 +10,11 @@ export const buttonClasses = (variant: ButtonVariant = "primary", size: ButtonSi
     "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors select-none",
     "disabled:pointer-events-none disabled:opacity-50",
     {
-      primary: "bg-navy-800 text-white hover:bg-navy-700 active:bg-navy-900",
+      primary: "bg-primary text-white hover:bg-primary-hover active:bg-primary-strong",
       secondary: "bg-navy-50 text-navy-800 hover:bg-navy-100 border border-navy-100",
-      outline: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
+      outline: "border border-slate-300 bg-surface text-slate-800 hover:bg-slate-50",
       ghost: "text-slate-700 hover:bg-slate-100",
-      danger: "bg-red-700 text-white hover:bg-red-800",
+      danger: "bg-danger text-white hover:bg-danger-hover",
     }[variant],
     {
       sm: "min-h-9 px-3 text-sm",

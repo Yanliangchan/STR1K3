@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Dark mode is class-based: <html class="dark"> (set from the user's setting or the OS). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --color-navy-50: #f1f4f9;
@@ -13,6 +16,110 @@
   --color-navy-800: #1c2d48;
   --color-navy-900: #142036;
   --color-navy-950: #0c1424;
+
+  /* Semantic tokens (light values; dark values below). */
+  --color-surface: #ffffff;
+  --color-primary: #1c2d48;
+  --color-primary-hover: #253b5d;
+  --color-primary-strong: #142036;
+  --color-on-primary-muted: #dfe6f1;
+  --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
+  --color-crow: #9f1239;
+}
+
+/*
+ * Dark theme: remap the neutral and tint scales so existing utilities adapt.
+ * Low steps (backgrounds/tints) become dark, high steps (text) become light.
+ * Solid fills with white text use the semantic tokens above.
+ */
+.dark {
+  color-scheme: dark;
+  --color-surface: #111a2a;
+  --color-primary: #3b5f9e;
+  --color-primary-hover: #4870b5;
+  --color-primary-strong: #2c4a80;
+  --color-on-primary-muted: #d6e2f7;
+  --color-danger: #b42323;
+  --color-danger-hover: #c53030;
+  --color-crow: #b4304f;
+
+  --color-slate-50: #0a101c;
+  --color-slate-100: #1a2436;
+  --color-slate-200: #243044;
+  --color-slate-300: #3a4862;
+  --color-slate-400: #6b7a93;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #aab6c8;
+  --color-slate-700: #c7d0dd;
+  --color-slate-800: #dde3ec;
+  --color-slate-900: #eef2f7;
+  --color-slate-950: #f8fafc;
+
+  --color-navy-50: #16223a;
+  --color-navy-100: #1d2c4b;
+  --color-navy-200: #2b3f66;
+  --color-navy-300: #3d5585;
+  --color-navy-400: #5672a6;
+  --color-navy-500: #7a93c4;
+  --color-navy-600: #9ab0db;
+  --color-navy-700: #b3c6ea;
+  --color-navy-800: #c9d7f1;
+  --color-navy-900: #dfe8f8;
+  --color-navy-950: #eef3fc;
+
+  --color-red-50: #2a1215;
+  --color-red-100: #3d171b;
+  --color-red-200: #5c1f25;
+  --color-red-300: #8a2d35;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
+  --color-amber-50: #2a1f0a;
+  --color-amber-100: #3a2a0b;
+  --color-amber-200: #5a4210;
+  --color-amber-300: #7a5a14;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #fbbf24;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+  --color-amber-950: #fef3c7;
+
+  --color-emerald-50: #0c2a20;
+  --color-emerald-100: #0f3a2b;
+  --color-emerald-200: #14523c;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-sky-50: #0c2233;
+  --color-sky-200: #1b4f72;
+  --color-sky-800: #bae6fd;
+}
+
+/* Charts */
+.viz {
+  --chart-single: #2f4a73;
+  color: var(--color-slate-600);
+}
+.dark .viz {
+  --chart-single: #8fa9da;
+}
+.viz .single-series path,
+.viz .single-series rect {
+  fill: var(--chart-single);
+}
+.viz .single-series .recharts-area-curve {
+  stroke: var(--chart-single);
+}
+.recharts-default-tooltip {
+  background: var(--color-surface) !important;
+  border-color: var(--color-slate-200) !important;
+  color: var(--color-slate-900);
 }
 
 @layer base {
@@ -50,4 +157,7 @@
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+.recharts-tooltip-item {
+  color: var(--color-slate-800) !important;
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Ban, Pencil } from "lucide-react";
 import { correctRecordAction, voidRecordAction } from "@/app/actions/data";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ type Rec = {
 };
 
 export function RecordActions({ rec, categories }: { rec: Rec; categories: { id: string; name: string; active: boolean }[] }) {
-  const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [v, setV] = useState({
@@ -51,7 +49,6 @@ export function RecordActions({ rec, categories }: { rec: Rec; categories: { id:
       }
       toast("success", "Correction saved. The previous values are kept in the history.");
       setOpen(false);
-      router.refresh();
     } catch {
       setError("Could not reach the server. Nothing was changed.");
     } finally {

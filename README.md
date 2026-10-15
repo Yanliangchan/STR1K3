@@ -14,6 +14,10 @@ Cadets have no accounts. Everything is entered by instructors.
 |---|---|
 | **Find anything, fast** | One search (header icon, the bar on Home, or `/` / Ctrl+K on desktop) finds cadets, statements, records **and pages**. Each cadet result has **NOR / CROW / Stmt** buttons to start a record for them straight away; typing "stats" or "export" jumps to that page. Recently viewed cadets show when the box is empty. Press `n` anywhere for a new record. |
 | **Fewer taps** | <ul><li>Statement actions (**Handed in / Accept / Rewrite**) appear wherever a statement is listed: Home, the cadet profile and the queue.</li><li>Roster selection offers **+ NOR / + CROW / Statement** directly.</li><li>A single-cadet record is created in one tap. The confirm step is kept for bulk.</li><li>**Recently used descriptions** are one-tap chips that also fill the category, and the last category used for each type is remembered.</li><li>After saving NORs/CROWs: **Request statements from these cadets** (subject and occurrence carried over) or **Another record for the same cadets**.</li></ul> |
+| **Undo** | After a quick **Handed in / Accept / Rewrite** (button or swipe), the toast offers **Undo** for 10 seconds. Nothing is deleted: the hand-in or review is marked *undone* and stays visible in the history, the previous status and deadline are restored, and the undo is audited. Only the instructor who made the change can undo it, within 2 minutes, and only if nothing has changed since. |
+| **Swipe** | In the statement queue, swipe a row right to mark it handed in or to accept it. Buttons remain for everyone else. |
+| **Install & offline** | Installable to the home screen (Android: *Install* in **More**; iPhone: Share → *Add to Home Screen*), with app shortcuts. If the connection drops while saving a NOR/CROW/statement request, it is kept in an on-device outbox and **sent automatically when you're back online**; the idempotency key means it can never be saved twice. A banner shows what is waiting to send. For security, the service worker caches only app files and a generic offline page, **never cadet pages or data**. |
+| **Dark mode** | Follows the phone/computer setting by default; switch Auto / Light / Dark in **More** or **Account** (remembered per device). |
 | **Self-guiding** | Until there is an active batch with cadets, Home shows a **setup checklist** with the next step highlighted. |
 | **Sign-in** | Email + password (scrypt-hashed). Sessions are database-backed with HTTP-only cookies: 7 days idle, 30 days maximum (both configurable). Instructors can sign out other devices. Failed sign-ins are rate-limited. Administrators reset passwords, and the instructor must choose a new one at next sign-in. |
 | **Active batch** | Exactly one active batch, stored in a database singleton with a unique constraint. The app always opens into it. Changing it is an explicit action: you type the batch name to confirm, and the change is audited. A new batch is never activated automatically. |
@@ -108,7 +112,7 @@ npm run build && E2E_DATABASE_URL=postgresql://user:pass@localhost:5432/str1k3_e
 
 Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a different Chromium binary.
 
-**Integration tests (50)** cover:
+**Integration tests (53)** cover:
 - passwords, sign-in, rate limiting, session renewal, idle and absolute expiry, logout and revocation, deactivation, and admin-only account management
 - single active batch, explicit switching, new batches starting empty, and historical isolation
 - rejection of cross-batch writes at both the service and database level
@@ -117,14 +121,16 @@ Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a differ
 - corrections with diffs, and voiding
 - all four statement statuses with independence between cadets, submissions history, invalid transitions, reopen and bulk accept
 - required deadlines (stored in the configured time zone), new deadlines on rewrite, overdue counts and late hand-ins
+- undo of hand-ins, accepts and rewrites (restoring the deadline), ownership, the 2-minute window, and that nothing is deleted
 - dashboard ordering (overdue first), flagged-cadet thresholds and reasons (shared occurrences count once), and insights shown only with enough data
 - dashboard counts against the database, statistics filters, and recurring flags without double counting
 - append-only audit, no hard deletes, CSV formula injection, export scoping, and CSV import validation
 
-**End-to-end tests (8, mobile viewport)** cover:
+**End-to-end tests (13, mobile viewport)** cover:
 - the full Definition of Done workflow: sign in, land on the active batch, search and multi-select cadets, bulk-create statements, take three statements down independent paths (pending review, rewrite, accepted), check dashboard counts, cadet history and statistics, sign out and back in, switch the active batch and back, and check the activity history
 - bulk NOR creation using the type-ahead picker, with a correction that keeps the previous value
 - the search palette (name → NOR for that cadet → one-tap create → follow-up statement request, and jumping to pages by name), statement actions from Home and the cadet profile,
+- Undo from the toast, swipe-to-act, offline save then automatic send on reconnect, dark mode persistence, and the install assets (manifest, icons, service worker, offline page),
 - the dashboard section order and explanations, the Overdue tab with one-tap "Handed in", and the roster search surviving Back from a cadet profile
 - unauthenticated API rejection
 
@@ -175,6 +181,6 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 - **Per-cadet overrides in bulk entry** cover description/subject and notes. Category, dates and the deadline are shared across the selection; each one can be changed individually afterwards (deadline via *Edit / extend deadline*).
 - **Long lists are capped** rather than paginated: the newest 200 records and 300 statements per view, and 50 entries per page in the activity history. Filters narrow the lists.
 - **Notifications** appear in the in-app activity feed only (no push or email).
-- **Offline:** there is no offline queue. The new-record form keeps an unsent draft on the device and retries safely when the connection returns.
+- **Offline:** only *creating* NOR/CROW/statement records works offline (queued and sent later). Viewing records and other changes (reviews, corrections) need a connection.
 - **"Outstanding over time"** is rebuilt from the audit trail, so data written directly to the database outside the app is not reflected.
-- **Light theme only. A single configured time zone.**
+- **A single configured time zone.**

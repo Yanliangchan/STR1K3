@@ -101,7 +101,7 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
               </FilterField>
             </div>
             <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input type="checkbox" name="includeVoided" value="1" className="h-5 w-5 accent-navy-700" /> Include voided entries
+              <input type="checkbox" name="includeVoided" value="1" className="h-5 w-5 accent-primary" /> Include voided entries
             </label>
             <div className="sm:col-span-2">
               <button type="submit" className={buttonClasses("primary")}>

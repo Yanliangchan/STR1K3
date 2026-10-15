@@ -1,9 +1,23 @@
 {
   "name": "STR1K3",
   "short_name": "STR1K3",
+  "description": "Instructor records for NORs, CROWs and statements.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f8fafc",
   "theme_color": "#142036",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "New NOR", "url": "/records/new?type=NOR" },
+    { "name": "Request statements", "url": "/records/new?type=STATEMENT" },
+    { "name": "Statement queue", "url": "/statements" }
+  ]
 }

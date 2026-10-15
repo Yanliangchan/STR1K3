@@ -19,11 +19,11 @@ export function FilterBar({
   activeCount: number;
 }) {
   return (
-    <details className="group mb-4 rounded-xl border border-slate-200 bg-white" open={activeCount > 0 ? true : undefined}>
+    <details className="group mb-4 rounded-xl border border-slate-200 bg-surface" open={activeCount > 0 ? true : undefined}>
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium text-slate-800">
         <SlidersHorizontal className="h-4 w-4" aria-hidden />
         Filters
-        {activeCount > 0 && <span className="rounded-full bg-navy-800 px-2 text-xs text-white">{activeCount}</span>}
+        {activeCount > 0 && <span className="rounded-full bg-primary px-2 text-xs text-white">{activeCount}</span>}
         <span className="ml-auto text-xs text-slate-500 group-open:hidden">Show</span>
       </summary>
       <form method="get" className="grid gap-3 border-t border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -52,4 +52,4 @@ export function FilterField({ label, children }: { label: string; children: Reac
 }
 
 export const filterControl =
-  "block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200";
+  "block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-base text-slate-900 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200";

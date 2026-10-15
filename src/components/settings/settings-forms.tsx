@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { KeyRound, Plus } from "lucide-react";
 import {
   createCategoryAction,
@@ -20,7 +19,6 @@ import { useToast } from "@/components/ui/toast";
 import type { ActionResult } from "@/server/action";
 
 function useRun() {
-  const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +36,6 @@ function useRun() {
       }
       setFieldErrors({});
       toast("success", ok);
-      router.refresh();
       return true;
     } catch {
       setError("Could not reach the server. Nothing was changed.");

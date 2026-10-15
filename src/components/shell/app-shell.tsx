@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "./command-palette";
+import { OutboxSync } from "./outbox-sync";
 import {
   Activity,
   BarChart3,
@@ -81,16 +82,22 @@ export function AppShell({
       window.removeEventListener("str1k3:open-search", openSearch);
     };
   }, [router]);
+  // Register the service worker (installable app + offline page). Production only.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
   const moreActive = pathname === "/more" || secondary.some((s) => isActive(pathname, s.href)) || pathname.startsWith("/account");
 
   return (
     <div className="min-h-dvh lg:pl-64">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[70] focus:rounded focus:bg-white focus:px-3 focus:py-2">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[70] focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         Skip to content
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex" aria-label="Main navigation">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-surface lg:flex" aria-label="Main navigation">
         <Link href="/" className="flex items-center gap-2.5 px-5 py-4">
           <Logo />
           <Wordmark />
@@ -122,7 +129,7 @@ export function AppShell({
       </aside>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 pt-safe backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface/95 pt-safe backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
           <Link href="/" className="flex items-center gap-2 lg:hidden" aria-label="STR1K3 home">
             <Logo className="h-7 w-7" />
@@ -136,7 +143,7 @@ export function AppShell({
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-slate-600 hover:bg-slate-100 lg:min-w-64 lg:border lg:border-slate-300 lg:bg-white lg:text-left"
+            className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-slate-600 hover:bg-slate-100 lg:min-w-64 lg:border lg:border-slate-300 lg:bg-surface lg:text-left"
             aria-label="Search everything (shortcut: /)"
             aria-keyshortcuts="/ Control+K"
             data-testid="open-search"
@@ -147,7 +154,7 @@ export function AppShell({
           </button>
           <Link
             href="/records/new"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-navy-800 px-3 text-sm font-medium text-white hover:bg-navy-700"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-white hover:bg-primary-hover"
           >
             <Plus className="h-4 w-4" aria-hidden />
             <span>New<span className="hidden sm:inline"> record</span></span>
@@ -158,11 +165,12 @@ export function AppShell({
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       <main id="main" className="mx-auto max-w-6xl px-4 pb-28 pt-4 lg:pb-12">
+        <OutboxSync />
         {children}
       </main>
 
       {/* Mobile bottom navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-safe lg:hidden" aria-label="Main navigation">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-surface pb-safe lg:hidden" aria-label="Main navigation">
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {[...primary, { href: "/more", label: "More", Icon: MoreHorizontal }].map(({ href, label, Icon }) => {
             const active = href === "/more" ? moreActive : isActive(pathname, href);

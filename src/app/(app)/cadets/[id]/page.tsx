@@ -46,7 +46,7 @@ export default async function CadetPage({
     }),
     prisma.statement.findMany({
       where: { cadetId: cadet.id, batchId: cadet.batchId },
-      include: { createdBy: { select: { name: true } }, _count: { select: { versions: true } } },
+      include: { createdBy: { select: { name: true } }, _count: { select: { versions: { where: { retractedAt: null } } } } },
     }),
     cadetCounts(cadet.batchId, [cadet.id]),
     recurringFlags(cadet.batchId, { cadetId: cadet.id }),
@@ -174,7 +174,7 @@ export default async function CadetPage({
                       {st.status === "PENDING_REVIEW" ? "Handed in — waiting for your review" : `Deadline ${formatDeadline(st.dueAt)} · ${dueRelative(st.dueAt)}`}
                     </span>
                   </Link>
-                  {!readOnly && <StatementQuickActions id={st.id} status={st.status} versions={st._count.versions} cadetName={cadet.name} today={todayISO()} />}
+                  {!readOnly && <StatementQuickActions id={st.id} status={st.status} cadetName={cadet.name} today={todayISO()} />}
                 </li>
               ))}
             </ul>
@@ -205,7 +205,7 @@ export default async function CadetPage({
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium",
-                  active ? "bg-navy-800 text-white" : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50",
+                  active ? "bg-primary text-white" : "bg-surface text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50",
                 )}
               >
                 {t.label}

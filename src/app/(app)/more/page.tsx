@@ -3,6 +3,8 @@ import { Activity, BarChart3, ChevronRight, Download, FolderCog, LogOut, Setting
 import { logoutAction } from "@/app/actions/auth";
 import { requireSession } from "@/server/auth/current";
 import { Card } from "@/components/ui/misc";
+import { ThemeSwitcher } from "@/components/settings/theme-switcher";
+import { InstallApp } from "@/components/shell/install-app";
 
 export const metadata = { title: "More" };
 
@@ -20,6 +22,7 @@ export default async function MorePage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">More</h1>
+      <InstallApp />
       <Card>
         <ul className="divide-y divide-slate-100">
           {items.map(({ href, label, desc, Icon }) => (
@@ -35,6 +38,10 @@ export default async function MorePage() {
             </li>
           ))}
         </ul>
+      </Card>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm font-medium text-slate-800">Appearance</p>
+        <ThemeSwitcher />
       </Card>
       <Card className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">

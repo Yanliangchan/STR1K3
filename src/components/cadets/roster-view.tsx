@@ -163,7 +163,7 @@ export function RosterView({
           {/* Mobile cards */}
           <ul className="space-y-2 md:hidden">
             {rows.map((r) => (
-              <li key={r.id} className={cn("flex items-stretch rounded-xl border bg-white", selected.has(r.id) ? "border-navy-400 ring-1 ring-navy-300" : "border-slate-200")}>
+              <li key={r.id} className={cn("flex items-stretch rounded-xl border bg-surface", selected.has(r.id) ? "border-navy-400 ring-1 ring-navy-300" : "border-slate-200")}>
                 <label className="flex w-12 shrink-0 cursor-pointer items-center justify-center">
                   <Checkbox checked={selected.has(r.id)} onChange={() => toggle(r.id)} disabled={readOnly || r.status !== "ACTIVE"} aria-label={`Select ${r.name}`} />
                 </label>
@@ -183,7 +183,7 @@ export function RosterView({
           </ul>
 
           {/* Desktop table */}
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white md:block">
+          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-surface md:block">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -226,7 +226,7 @@ export function RosterView({
       )}
 
       {selected.size > 0 && !readOnly && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur lg:bottom-0 lg:left-64">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-surface/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur lg:bottom-0 lg:left-64">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-medium text-slate-800" aria-live="polite">
               {pluralize(selected.size, "cadet")} selected

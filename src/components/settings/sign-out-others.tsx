@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signOutOtherDevicesAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
 export function SignOutOthers({ disabled }: { disabled: boolean }) {
   const [pending, setPending] = useState(false);
-  const router = useRouter();
   const toast = useToast();
   return (
     <Button
@@ -21,7 +19,6 @@ export function SignOutOthers({ disabled }: { disabled: boolean }) {
         setPending(false);
         if (res?.ok) {
           toast("success", "Signed out of all other devices.");
-          router.refresh();
         } else toast("error", res && !res.ok ? res.error : "Could not reach the server.");
       }}
     >

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offline · STR1K3</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #0f172a; padding: 16px; }
+  @media (prefers-color-scheme: dark) { body { background: #0a101c; color: #eef2f7; } .card { background: #111a2a !important; border-color: #243044 !important; } p { color: #aab6c8 !important; } }
+  .card { max-width: 380px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; text-align: center; }
+  img { width: 56px; height: 56px; }
+  h1 { font-size: 20px; margin: 12px 0 4px; }
+  p { color: #475569; margin: 8px 0; }
+  button { margin-top: 12px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 10px; background: #1c2d48; color: #fff; font: inherit; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="/icons/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>STR1K3 needs a connection to show records.</p>
+    <p>Records you saved while offline are kept on this device and will be sent automatically when you're back online.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

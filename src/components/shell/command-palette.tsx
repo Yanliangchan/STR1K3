@@ -160,13 +160,13 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
-        <D.Overlay className="fixed inset-0 z-50 bg-slate-950/40" />
+        <D.Overlay className="fixed inset-0 z-50 bg-black/50" />
         <D.Content
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             inputRef.current?.focus();
           }}
-          className="fixed inset-0 z-50 flex flex-col bg-white outline-none sm:inset-x-auto sm:left-1/2 sm:top-[10vh] sm:bottom-auto sm:max-h-[75vh] sm:w-full sm:max-w-xl sm:-translate-x-1/2 sm:rounded-2xl sm:shadow-2xl"
+          className="fixed inset-0 z-50 flex flex-col bg-surface outline-none sm:inset-x-auto sm:left-1/2 sm:top-[10vh] sm:bottom-auto sm:max-h-[75vh] sm:w-full sm:max-w-xl sm:-translate-x-1/2 sm:rounded-2xl sm:shadow-2xl"
           aria-describedby={undefined}
         >
           <D.Title className="sr-only">Search and go</D.Title>
@@ -217,7 +217,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                               key={t}
                               type="button"
                               onClick={() => go(`/records/new?type=${t}&cadets=${c.id}`)}
-                              className="min-h-10 rounded-md bg-white px-2 text-xs font-semibold text-navy-800 ring-1 ring-inset ring-slate-300 hover:bg-navy-50"
+                              className="min-h-10 rounded-md bg-surface px-2 text-xs font-semibold text-navy-800 ring-1 ring-inset ring-slate-300 hover:bg-navy-50"
                               aria-label={`New ${t === "STATEMENT" ? "statement request" : t} for ${c.name}`}
                             >
                               {t === "STATEMENT" ? "Stmt" : t}

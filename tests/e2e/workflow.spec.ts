@@ -192,6 +192,7 @@ test("home leads with outstanding statements and flagged cadets, with explanatio
 test("statement queue quick actions and overdue tab", async ({ page }) => {
   await signIn(page);
   await page.goto("/statements?status=OVERDUE");
+  await page.waitForLoadState("networkidle");
   const rows = page.getByTestId("statement-queue").locator(":scope > li");
   const before = await rows.count();
   expect(before).toBeGreaterThan(0);
@@ -255,4 +256,75 @@ test("statements can be actioned straight from Home and the cadet profile", asyn
   await list.locator("a[href^='/cadets/']").first().click();
   await expect(page.getByRole("heading", { name: /Open statements/ })).toBeVisible();
   await expect(page.getByTestId("quick-receive").or(page.getByTestId("quick-accept")).first()).toBeVisible();
+});
+
+test("undo a mis-tapped Accept from the toast", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/statements?status=PENDING_REVIEW");
+  await page.waitForLoadState("networkidle");
+  const queue = page.getByTestId("statement-queue");
+  const first = queue.locator(":scope > li").first();
+  const name = (await first.locator("a span.font-medium").first().innerText()).trim();
+  await first.getByTestId("quick-accept").click();
+  await expect(page.getByText(`${name}: accepted.`)).toBeVisible();
+  await expect(queue.getByText(name, { exact: true })).toHaveCount(0);
+  await page.getByTestId("toast-undo").click();
+  await expect(page.getByText("Undone.")).toBeVisible();
+  await expect(queue.getByText(name, { exact: true })).toHaveCount(1);
+});
+
+test("swipe a statement right to mark it handed in", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/statements?status=NOT_SUBMITTED");
+  await page.waitForLoadState("networkidle");
+  const queue = page.getByTestId("statement-queue");
+  const first = queue.locator(":scope > li").first();
+  const name = (await first.locator("a span.font-medium").first().innerText()).trim();
+  const target = first.locator("[style*='pan-y']");
+  await target.waitFor();
+  const box = (await target.boundingBox())!;
+  const y = box.y + 30;
+  const base = { pointerType: "touch", pointerId: 7, isPrimary: true, bubbles: true };
+  await target.dispatchEvent("pointerdown", { ...base, clientX: box.x + 20, clientY: y });
+  for (const dx of [30, 80, 160, 260]) await target.dispatchEvent("pointermove", { ...base, clientX: box.x + 20 + dx, clientY: y });
+  await target.dispatchEvent("pointerup", { ...base, clientX: box.x + 280, clientY: y });
+  await expect(page.getByText(`${name}: handed in.`)).toBeVisible();
+  await expect(page.getByTestId("toast-undo")).toBeVisible();
+  await expect(queue.getByText(name, { exact: true })).toHaveCount(0);
+});
+
+test("records created while offline are queued and sent when back online", async ({ page, context }) => {
+  await signIn(page);
+  const norBefore = await count(page, "count-nor");
+  await page.goto("/records/new?type=NOR");
+  const box = page.getByRole("combobox", { name: /cadet's name/ });
+  await box.fill("reese");
+  await box.press("Enter");
+  await page.getByLabel("Observation").fill("E2E: offline entry");
+  await context.setOffline(true);
+  await page.getByTestId("review-entries").click();
+  await expect(page.getByTestId("entry-queued")).toBeVisible();
+  await expect(page.getByTestId("outbox-banner")).toContainText("waiting to send");
+  await context.setOffline(false);
+  await expect(page.getByText(/^Sent: 1 NOR for/)).toBeVisible({ timeout: 15_000 });
+  expect(await count(page, "count-nor")).toBe(norBefore + 1);
+});
+
+test("dark mode can be switched on and is remembered", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/more");
+  await page.getByTestId("theme-dark").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.getByTestId("theme-light").click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+});
+
+test("app is installable: manifest, icons, service worker and offline page are served", async ({ request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest.display).toBe("standalone");
+  for (const icon of manifest.icons) expect((await request.get(icon.src)).status()).toBe(200);
+  expect((await request.get("/sw.js")).status()).toBe(200);
+  expect(await (await request.get("/offline.html")).text()).toContain("You're offline");
 });

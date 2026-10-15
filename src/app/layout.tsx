@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { ToastProvider } from "@/components/ui/toast";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,18 +9,30 @@ export const metadata: Metadata = {
   description: "Instructor records for NORs, CROWs and statements.",
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "STR1K3", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#142036",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#142036" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a101c" },
+  ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Applies "auto" before first paint so there is no flash of the wrong theme.
+const themeScript = `(function(){try{var m=window.matchMedia('(prefers-color-scheme: dark)');var a=function(){if(document.documentElement.dataset.theme==='auto'){document.documentElement.classList.toggle('dark',m.matches)}};a();m.addEventListener('change',a)}catch(e){}})();`;
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="en-GB">
+    <html lang="en-GB" data-theme={theme} className={theme === "dark" ? "dark" : undefined} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         <ToastProvider>{children}</ToastProvider>
       </body>

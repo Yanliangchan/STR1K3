@@ -334,6 +334,9 @@ model StatementVersion {
   receivedAt    DateTime
   /// Deadline that applied to this submission (to show late hand-ins).
   dueAt         DateTime?
+  /// Set when a hand-in recorded in error was undone. Kept for the audit trail.
+  retractedAt   DateTime?
+  retractedById String?
   recordedById  String
   recordedBy    User      @relation("VersionRecordedBy", fields: [recordedById], references: [id])
   createdAt     DateTime  @default(now())
@@ -346,18 +349,21 @@ model StatementVersion {
 // Each review decision on a version. Kept separately so reopening an accepted
 // statement adds a new review rather than overwriting the earlier one.
 model StatementReview {
-  id           String            @id @default(cuid())
-  statementId  String
-  statement    Statement         @relation(fields: [statementId], references: [id], onDelete: Restrict)
-  versionId    String?
-  version      StatementVersion? @relation(fields: [versionId], references: [id], onDelete: Restrict)
-  outcome      ReviewOutcome
-  feedback     String?
+  id            String            @id @default(cuid())
+  statementId   String
+  statement     Statement         @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  versionId     String?
+  version       StatementVersion? @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  outcome       ReviewOutcome
+  feedback      String?
   /// New deadline set when a rewrite is required.
-  newDueAt     DateTime?
-  reviewedAt   DateTime          @default(now())
-  reviewedById String
-  reviewedBy   User              @relation(fields: [reviewedById], references: [id])
+  newDueAt      DateTime?
+  /// Set when the review decision was undone. Kept for the audit trail.
+  retractedAt   DateTime?
+  retractedById String?
+  reviewedAt    DateTime          @default(now())
+  reviewedById  String
+  reviewedBy    User              @relation(fields: [reviewedById], references: [id])
 
   @@index([statementId, reviewedAt])
 }

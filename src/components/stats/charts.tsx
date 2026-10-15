@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
 // Validated categorical slots (CVD-safe adjacent pairs); single-series charts use navy.
 const SERIES = { nor: "#2a78d6", crow: "#eb6834", statements: "#1baf7a" };
 const SINGLE = "#2f4a73";
-const AXIS = { fontSize: 12, fill: "#52514e" };
-const GRID = "#e5e7eb";
+const AXIS = { fontSize: 12, fill: "currentColor" };
+const GRID = "currentColor";
 const withB = (href: string, b?: string | null) => (b ? `${href}${href.includes("?") ? "&" : "?"}b=${b}` : href);
 
 function ChartCard({
@@ -46,7 +46,7 @@ function ChartCard({
         {actions}
       </div>
       <p className="mb-3 text-sm text-slate-600">{summary}</p>
-      <div aria-hidden className="h-64 w-full">
+      <div aria-hidden className="viz h-64 w-full">
         {children}
       </div>
       <details className="mt-2 text-sm">
@@ -82,7 +82,7 @@ function ChartCard({
 }
 
 const tooltipStyle = {
-  contentStyle: { borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13 },
+  contentStyle: { borderRadius: 8, fontSize: 13 },
   cursor: { fill: "rgba(47,74,115,0.06)" },
 };
 
@@ -96,16 +96,17 @@ function SimpleBars({
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }} barCategoryGap={6}>
-        <CartesianGrid horizontal={false} stroke={GRID} />
+        <CartesianGrid horizontal={false} stroke={GRID} strokeOpacity={0.15} />
         <XAxis type="number" allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
         <YAxis type="category" dataKey="label" width={120} tick={AXIS} axisLine={false} tickLine={false} />
         <Tooltip {...tooltipStyle} formatter={(v: number) => [v, "Count"]} />
         <Bar isAnimationActive={false}
           dataKey="value"
           fill={SINGLE}
+          className="single-series"
           radius={[0, 4, 4, 0]}
           maxBarSize={28}
-          label={{ position: "right", fontSize: 12, fill: "#0b0b0b" }}
+          label={{ position: "right", fontSize: 12, fill: "currentColor" }}
           cursor={onSelect ? "pointer" : undefined}
           onClick={(d: { href?: string }) => d.href && onSelect?.(d.href)}
         />
@@ -162,7 +163,7 @@ export function ByteChart({ data, b }: { data: { byteId: string | null; byte: st
               key={m}
               onClick={() => setMode(m)}
               aria-pressed={mode === m}
-              className={cn("min-h-9 rounded-md px-3", mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}
+              className={cn("min-h-9 rounded-md px-3", mode === m ? "bg-surface text-slate-900 shadow-sm" : "text-slate-600")}
             >
               {m === "both" ? "Both" : m.toUpperCase()}
             </button>
@@ -172,7 +173,7 @@ export function ByteChart({ data, b }: { data: { byteId: string | null; byte: st
     >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ left: -16, right: 8, top: 8, bottom: 4 }} barGap={2}>
-          <CartesianGrid vertical={false} stroke={GRID} />
+          <CartesianGrid vertical={false} stroke={GRID} strokeOpacity={0.15} />
           <XAxis dataKey="byte" tick={AXIS} axisLine={false} tickLine={false} interval={0} />
           <YAxis allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
           <Tooltip {...tooltipStyle} />
@@ -229,10 +230,10 @@ export function ActivityChart({
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ left: -16, right: 8, top: 8, bottom: 4 }}>
-          <CartesianGrid vertical={false} stroke={GRID} />
+          <CartesianGrid vertical={false} stroke={GRID} strokeOpacity={0.15} />
           <XAxis dataKey="date" tick={AXIS} axisLine={false} tickLine={false} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />
           <YAxis allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle.contentStyle} cursor={{ stroke: "#94a3b8" }} />
+          <Tooltip contentStyle={tooltipStyle.contentStyle} cursor={{ stroke: "currentColor", strokeOpacity: 0.4 }} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Line isAnimationActive={false} type="linear" dataKey="nor" name="NOR" stroke={SERIES.nor} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line isAnimationActive={false} type="linear" dataKey="crow" name="CROW" stroke={SERIES.crow} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
@@ -254,11 +255,11 @@ export function OutstandingChart({ data }: { data: { date: string; outstanding: 
     >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ left: -16, right: 8, top: 8, bottom: 4 }}>
-          <CartesianGrid vertical={false} stroke={GRID} />
+          <CartesianGrid vertical={false} stroke={GRID} strokeOpacity={0.15} />
           <XAxis dataKey="date" tick={AXIS} axisLine={false} tickLine={false} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />
           <YAxis allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle.contentStyle} cursor={{ stroke: "#94a3b8" }} formatter={(v: number) => [v, "Outstanding"]} />
-          <Area isAnimationActive={false} type="stepAfter" dataKey="outstanding" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.12} />
+          <Tooltip contentStyle={tooltipStyle.contentStyle} cursor={{ stroke: "currentColor", strokeOpacity: 0.4 }} formatter={(v: number) => [v, "Outstanding"]} />
+          <Area className="single-series" isAnimationActive={false} type="stepAfter" dataKey="outstanding" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.12} />
         </AreaChart>
       </ResponsiveContainer>
     </ChartCard>

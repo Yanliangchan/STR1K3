@@ -4,7 +4,7 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type Selec
 import { cn } from "@/lib/utils";
 
 const control =
-  "block w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 placeholder:text-slate-400 " +
+  "block w-full rounded-lg border border-slate-300 bg-surface px-3 text-base text-slate-900 placeholder:text-slate-400 " +
   "focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200 disabled:bg-slate-100 disabled:text-slate-500 " +
   "aria-[invalid=true]:border-red-600 aria-[invalid=true]:ring-red-100";
 
@@ -86,7 +86,7 @@ export function Checkbox({ className, ...rest }: InputHTMLAttributes<HTMLInputEl
   return (
     <input
       type="checkbox"
-      className={cn("h-5 w-5 shrink-0 rounded border-slate-400 accent-navy-700", className)}
+      className={cn("h-5 w-5 shrink-0 rounded border-slate-400 accent-primary", className)}
       {...rest}
     />
   );

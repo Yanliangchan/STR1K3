@@ -2,6 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { env } from "@/lib/env";
 import { login } from "@/server/auth/login";
 import { SESSION_COOKIE, revokeAllSessions, revokeSession } from "@/server/auth/session";
@@ -77,6 +78,7 @@ export async function signOutOtherDevicesAction(): Promise<ActionResult<null>> {
       entityId: session.user.id,
       summary: `${session.user.name} signed out of all other devices`,
     });
+    revalidatePath("/", "layout");
     return { ok: true, data: null };
   } catch (e) {
     return toActionError(e);
@@ -87,6 +89,7 @@ export async function changePasswordAction(input: { current: string; next: strin
   try {
     const session = await requireSession({ allowPasswordChange: true });
     await changeOwnPassword(actorFrom(session), session.sessionId, input);
+    revalidatePath("/", "layout");
     return { ok: true, data: null };
   } catch (e) {
     return toActionError(e);

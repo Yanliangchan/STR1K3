@@ -31,7 +31,6 @@ export function PasswordForm({ redirectTo }: { redirectTo?: string }) {
     setV({ current: "", next: "", confirm: "" });
     toast("success", "Password changed. Other devices have been signed out.");
     if (redirectTo) router.replace(redirectTo);
-    router.refresh();
   }
 
   return (

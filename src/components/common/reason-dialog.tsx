@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { Button, type ButtonVariant } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Textarea } from "@/components/ui/form";
@@ -31,7 +30,6 @@ export function ReasonDialog({
   onConfirm: (reason: string) => Promise<ActionResult<unknown>>;
   children?: ReactNode;
 }) {
-  const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -54,7 +52,6 @@ export function ReasonDialog({
       setOpen(false);
       setReason("");
       setError(null);
-      router.refresh();
     } catch {
       setError("Could not reach the server. Nothing was changed.");
     } finally {

@@ -89,8 +89,8 @@ export async function listStatements(batchId: string, f: StatementListQuery = {}
       where,
       include: {
         cadet: { include: { byte: true } },
-        _count: { select: { versions: true } },
-        versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { receivedAt: true, dueAt: true } },
+        _count: { select: { versions: { where: { retractedAt: null } } } },
+        versions: { where: { retractedAt: null }, orderBy: { versionNumber: "desc" }, take: 1, select: { receivedAt: true, dueAt: true } },
       },
       orderBy: [{ dueAt: "asc" }],
       take,
@@ -137,7 +137,7 @@ type Loaded = Awaited<ReturnType<typeof loadForWrite>>;
 async function loadForWrite(statementId: string, expectedStatus?: StatementStatus) {
   const s = await prisma.statement.findUnique({
     where: { id: statementId },
-    include: { batch: true, cadet: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+    include: { batch: true, cadet: true, versions: { where: { retractedAt: null }, orderBy: { versionNumber: "desc" }, take: 1 } },
   });
   if (!s) throw notFound("Statement");
   if (s.batch.status !== "OPEN") throw readOnly();
@@ -197,7 +197,9 @@ function receivedAtFor(day: string | undefined, time: string | null | undefined,
 }
 
 async function receiptTx(tx: Tx, actor: Actor, s: Loaded, receivedAt: Date) {
-  const versionNumber = (s.versions[0]?.versionNumber ?? 0) + 1;
+  // Numbering includes undone hand-ins so numbers are never reused.
+  const max = await tx.statementVersion.aggregate({ where: { statementId: s.id }, _max: { versionNumber: true } });
+  const versionNumber = (max._max.versionNumber ?? 0) + 1;
   const late = receivedAt > s.dueAt;
   await moveStatus(tx, s, "PENDING_REVIEW", actor.id, { lastReceivedAt: receivedAt });
   const version = await tx.statementVersion.create({
@@ -412,7 +414,7 @@ export async function bulkStatementAction(actor: Actor, input: z.input<typeof bu
   const newDueAt = data.action === "REWRITE" ? deadlineFrom(data.newDueDate, data.newDueTime) : null;
   const rows = await prisma.statement.findMany({
     where: { id: { in: ids }, batchId: data.batchId },
-    include: { batch: true, cadet: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+    include: { batch: true, cadet: true, versions: { where: { retractedAt: null }, orderBy: { versionNumber: "desc" }, take: 1 } },
   });
   if (rows.length !== ids.length) throw invalid("Some selected statements are not in this batch.");
   if (rows.some((r) => r.batch.status !== "OPEN")) throw readOnly();
@@ -444,4 +446,85 @@ export async function bulkStatementAction(actor: Actor, input: z.input<typeof bu
     });
   });
   return rows.length;
+}
+
+
+export type UndoRef = { type: "version" | "review"; id: string };
+export const UNDO_WINDOW_MS = 2 * 60_000;
+
+/**
+ * Undo a hand-in or review the same instructor recorded moments ago (e.g. a
+ * mis-tap). Nothing is deleted: the entry is marked retracted, the previous
+ * status (and deadline) is restored, and the undo is audited.
+ */
+export async function undoStatementChange(actor: Actor, input: { statementId: string; ref: UndoRef }) {
+  const data = parse(
+    z.object({ statementId: id, ref: z.object({ type: z.enum(["version", "review"]), id }) }),
+    input,
+  );
+  const s = await loadForWrite(data.statementId);
+  const now = new Date();
+  const tooLate = (at: Date) => now.getTime() - at.getTime() > UNDO_WINDOW_MS;
+
+  if (data.ref.type === "version") {
+    const versions = await prisma.statementVersion.findMany({
+      where: { statementId: s.id, retractedAt: null },
+      orderBy: { versionNumber: "desc" },
+      include: { reviews: { where: { retractedAt: null } } },
+    });
+    const v = versions[0];
+    if (!v || v.id !== data.ref.id) throw conflict("Only the most recent hand-in can be undone.");
+    if (v.recordedById !== actor.id) throw conflict("Only the instructor who recorded this hand-in can undo it.");
+    if (tooLate(v.createdAt)) throw conflict("Undo is only available for 2 minutes. Ask a colleague or void instead.");
+    if (s.status !== "PENDING_REVIEW" || v.reviews.length) throw conflict("This statement has changed since — it can no longer be undone.");
+    const previous = versions[1];
+    const restore: StatementStatus = previous ? "REWRITE_REQUIRED" : "NOT_SUBMITTED";
+    await prisma.$transaction(async (tx) => {
+      await moveStatus(tx, s, restore, actor.id, { lastReceivedAt: previous?.receivedAt ?? null });
+      await tx.statementVersion.update({ where: { id: v.id }, data: { retractedAt: now, retractedById: actor.id } });
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: "statement.undone",
+        entityType: "Statement",
+        entityId: s.id,
+        batchId: s.batchId,
+        cadetId: s.cadetId,
+        summary: `Undid hand-in for ${s.cadet.name} (back to ${statementStatusLabel[restore]})`,
+        changes: { status: { from: s.status, to: restore }, undone: "hand-in", version: v.versionNumber },
+        reason: "Undone immediately after recording",
+      });
+    });
+    return restore;
+  }
+
+  const r = await prisma.statementReview.findFirst({
+    where: { statementId: s.id, retractedAt: null },
+    orderBy: { reviewedAt: "desc" },
+    include: { version: true },
+  });
+  if (!r || r.id !== data.ref.id) throw conflict("Only the most recent review can be undone.");
+  if (r.reviewedById !== actor.id) throw conflict("Only the instructor who made this decision can undo it.");
+  if (tooLate(r.reviewedAt)) throw conflict("Undo is only available for 2 minutes. Use Reopen instead.");
+  if (s.status !== r.outcome) throw conflict("This statement has changed since — it can no longer be undone.");
+  const restoreDue = r.outcome === "REWRITE_REQUIRED" ? (r.version?.dueAt ?? s.dueAt) : s.dueAt;
+  await prisma.$transaction(async (tx) => {
+    await moveStatus(tx, s, "PENDING_REVIEW", actor.id, { acceptedAt: null, dueAt: restoreDue });
+    await tx.statementReview.update({ where: { id: r.id }, data: { retractedAt: now, retractedById: actor.id } });
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: "statement.undone",
+      entityType: "Statement",
+      entityId: s.id,
+      batchId: s.batchId,
+      cadetId: s.cadetId,
+      summary: `Undid "${statementStatusLabel[r.outcome]}" for ${s.cadet.name} (back to Pending review)`,
+      changes: {
+        status: { from: s.status, to: "PENDING_REVIEW" },
+        undone: r.outcome,
+        ...(restoreDue.getTime() !== s.dueAt.getTime() ? { dueAt: { from: s.dueAt.toISOString(), to: restoreDue.toISOString() } } : {}),
+      },
+      reason: "Undone immediately after recording",
+    });
+  });
+  return "PENDING_REVIEW" as const;
 }

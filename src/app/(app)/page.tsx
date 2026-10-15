@@ -85,7 +85,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <Link
               key={label}
               href={href}
-              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-navy-900 hover:border-navy-300 hover:bg-navy-50"
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-surface px-4 text-sm font-medium text-navy-900 hover:border-navy-300 hover:bg-navy-50"
             >
               <Icon className="h-4 w-4 text-navy-600" aria-hidden />
               {label}
@@ -131,7 +131,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                           <span className={cn(i.overdue ? "font-medium text-red-900" : i.dueSoon ? "font-medium text-amber-900" : "text-slate-700")}>{itemLine(i, now)}</span>
                           <span className="w-full text-xs text-slate-500 sm:w-auto">· {truncate(i.title, 60)}</span>
                         </Link>
-                        {!ctx.readOnly && <StatementQuickActions id={i.id} status={i.status} versions={i.versions} cadetName={c.name} today={today} />}
+                        {!ctx.readOnly && <StatementQuickActions id={i.id} status={i.status} cadetName={c.name} today={today} />}
                       </li>
                     ))}
                   </ul>
@@ -208,11 +208,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               return (
                 <li key={f.key}>
                   {f.href ? (
-                    <Link href={batchHref(f.href.split("?")[0]!, b, Object.fromEntries(new URLSearchParams(f.href.split("?")[1] ?? "")))} className="flex h-full gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-navy-300">
+                    <Link href={batchHref(f.href.split("?")[0]!, b, Object.fromEntries(new URLSearchParams(f.href.split("?")[1] ?? "")))} className="flex h-full gap-3 rounded-xl border border-slate-200 bg-surface p-4 hover:border-navy-300">
                       {body}
                     </Link>
                   ) : (
-                    <div className="flex h-full gap-3 rounded-xl border border-slate-200 bg-white p-4">{body}</div>
+                    <div className="flex h-full gap-3 rounded-xl border border-slate-200 bg-surface p-4">{body}</div>
                   )}
                 </li>
               );
@@ -230,7 +230,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               key={c.label}
               href={c.href}
               data-testid={c.testid}
-              className={cn("rounded-xl border bg-white px-3 py-2 hover:border-navy-300", c.tone === "red" && c.value > 0 ? "border-red-300" : "border-slate-200")}
+              className={cn("rounded-xl border bg-surface px-3 py-2 hover:border-navy-300", c.tone === "red" && c.value > 0 ? "border-red-300" : "border-slate-200")}
             >
               <p className="truncate text-xs text-slate-600">{c.label}</p>
               <p className={cn("text-xl font-semibold tabular-nums", c.tone === "red" && c.value > 0 ? "text-red-800" : "text-slate-900")} data-value={c.value}>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { StatementStatus } from "@prisma/client";
 import { AlarmClock, Ban, CheckCircle2, Inbox, PenLine, Pencil, RotateCcw } from "lucide-react";
 import {
@@ -19,6 +18,8 @@ import { useToast } from "@/components/ui/toast";
 import { ReasonDialog } from "@/components/common/reason-dialog";
 import { DeadlineInput } from "./deadline-input";
 import type { ActionResult } from "@/server/action";
+import type { UndoRef } from "@/server/services/statements";
+import { useUndoToast } from "./use-undoable";
 import { cn } from "@/lib/utils";
 
 export type WorkflowStatement = {
@@ -42,8 +43,6 @@ function addDays(iso: string, n: number) {
 }
 
 export function StatementWorkflow({ statement: s, today, nowTime }: { statement: WorkflowStatement; today: string; nowTime: string }) {
-  const router = useRouter();
-  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<string | null>(null);
@@ -53,7 +52,8 @@ export function StatementWorkflow({ statement: s, today, nowTime }: { statement:
   const [deadline, setDeadline] = useState({ date: addDays(today, 1), time: "23:59" });
   const [feedback, setFeedback] = useState("");
 
-  async function run(key: string, fn: () => Promise<ActionResult<unknown>>, ok: string) {
+  const undoToast = useUndoToast();
+  async function run(key: string, fn: () => Promise<ActionResult<{ undo?: UndoRef } | unknown>>, ok: string) {
     if (pending) return;
     setPending(key);
     setError(null);
@@ -68,8 +68,7 @@ export function StatementWorkflow({ statement: s, today, nowTime }: { statement:
       setFeedback("");
       setRewriteOpen(false);
       setCustomTime(false);
-      toast("success", ok);
-      router.refresh();
+      undoToast(ok, s.id, (res.data as { undo?: UndoRef } | undefined)?.undo);
     } catch {
       setError("Could not reach the server. The statement keeps its previous status.");
     } finally {
@@ -252,7 +251,6 @@ function ReopenDialog({ statementId, today }: { statementId: string; today: stri
 }
 
 function EditDetailsDialog({ s, today }: { s: WorkflowStatement; today: string }) {
-  const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const initial = { title: s.title, notes: s.notes ?? "", issuedOn: s.issuedOn, dueDate: s.dueDate, dueTime: s.dueTime, reason: "" };
@@ -271,7 +269,6 @@ function EditDetailsDialog({ s, today }: { s: WorkflowStatement; today: string }
       }
       toast("success", "Statement updated.");
       setOpen(false);
-      router.refresh();
     } catch {
       setError("Could not reach the server. Nothing was changed.");
     } finally {

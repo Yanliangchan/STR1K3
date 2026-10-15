@@ -47,7 +47,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <form method="get" role="search" className="flex gap-2">
         {ctx.contextParam && <input type="hidden" name="b" value={ctx.contextParam} />}
         <input name="q" type="search" defaultValue={q} autoFocus className={filterControl} placeholder="Cadet name, byte, description, reference…" aria-label="Search" />
-        <button className="inline-flex min-h-11 items-center rounded-lg bg-navy-800 px-4 text-white" aria-label="Search">
+        <button className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-white" aria-label="Search">
           <Search className="h-5 w-5" />
         </button>
       </form>

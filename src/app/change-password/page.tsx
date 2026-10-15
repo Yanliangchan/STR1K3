@@ -20,7 +20,7 @@ export default async function ChangePasswordPage() {
               : "Change your password."}
           </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-surface p-5 shadow-sm">
           <PasswordForm redirectTo="/" />
         </div>
         <form action={logoutAction} className="mt-4 text-center">

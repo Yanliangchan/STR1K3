@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { StatementStatus } from "@prisma/client";
 import { ChevronRight } from "lucide-react";
-import { bulkStatementAction, reviewStatementAction } from "@/app/actions/data";
+import { bulkStatementAction, recordReceiptAction, reviewStatementAction } from "@/app/actions/data";
+import { SwipeRow } from "@/components/ui/swipe-row";
+import { useUndoToast } from "./use-undoable";
 import { StatementQuickActions } from "./statement-quick-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input } from "@/components/ui/form";
@@ -43,7 +44,6 @@ type BulkAction = "RECEIVE" | "ACCEPT" | "REWRITE";
 type RewriteTarget = { ids: string[]; names: string[] } | null;
 
 export function StatementQueue({ rows, batchId, readOnly, today }: { rows: QueueRow[]; batchId: string; readOnly: boolean; today: string }) {
-  const router = useRouter();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState<null | Exclude<BulkAction, "REWRITE">>(null);
@@ -60,6 +60,23 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
   const canReceive = chosen.length > 0 && chosen.every((r) => r.status === "NOT_SUBMITTED" || r.status === "REWRITE_REQUIRED");
   const canReview = chosen.length > 0 && chosen.every((r) => r.status === "PENDING_REVIEW");
 
+  const undoToast = useUndoToast();
+  async function swipe(r: QueueRow) {
+    try {
+      const res =
+        r.status === "PENDING_REVIEW"
+          ? await reviewStatementAction({ statementId: r.id, outcome: "ACCEPTED" })
+          : await recordReceiptAction({ statementId: r.id, expectedStatus: r.status });
+      if (!res.ok) {
+        toast("error", res.error);
+        return;
+      }
+      undoToast(`${r.cadetName}: ${r.status === "PENDING_REVIEW" ? "accepted" : "handed in"}.`, r.id, res.data.undo);
+    } catch {
+      toast("error", "Could not reach the server. Nothing was changed.");
+    }
+  }
+
   async function run(key: string, fn: () => Promise<ActionResult<unknown>>, ok: string) {
     if (busy) return false;
     setBusy(key);
@@ -72,7 +89,6 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
         return false;
       }
       toast("success", ok);
-      router.refresh();
       return true;
     } catch {
       const msg = "Could not reach the server. Nothing was changed.";
@@ -149,6 +165,9 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
 
   return (
     <div className={cn(selected.size > 0 && "pb-28")}>
+      {!readOnly && selectable.length > 0 && (
+        <p className="mb-1 text-xs text-slate-500 lg:hidden">Tip: swipe a statement right to mark it handed in or accept it.</p>
+      )}
       {!readOnly && selectable.length > 1 && (
         <label className="mb-1 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700">
           <Checkbox
@@ -159,9 +178,16 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
           Select all {selectable.length} shown
         </label>
       )}
-      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white" data-testid="statement-queue">
+      <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-surface" data-testid="statement-queue">
         {rows.map((r) => (
-          <li key={r.id} className={cn("flex items-stretch", r.overdue && "bg-red-50/40")}>
+          <li key={r.id}>
+            <SwipeRow
+              enabled={!readOnly && !r.voided && r.status !== "ACCEPTED"}
+              label={r.status === "PENDING_REVIEW" ? "Accept" : "Handed in"}
+              tone={r.status === "PENDING_REVIEW" ? "green" : "navy"}
+              onCommit={() => swipe(r)}
+            >
+            <div className={cn("flex items-stretch", r.overdue && "bg-red-50/40")}>
             {!readOnly && (
               <label className="flex w-12 shrink-0 cursor-pointer items-start justify-center pt-4">
                 <Checkbox checked={selected.has(r.id)} onChange={() => toggle(r.id)} disabled={r.voided} aria-label={`Select statement for ${r.cadetName}`} />
@@ -196,16 +222,18 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
               </Link>
               {!readOnly && !r.voided && r.status !== "ACCEPTED" && (
                 <div className="mt-2">
-                  <StatementQuickActions id={r.id} status={r.status} versions={r.versions} cadetName={r.cadetName} today={today} />
+                  <StatementQuickActions id={r.id} status={r.status} cadetName={r.cadetName} today={today} />
                 </div>
               )}
             </div>
+            </div>
+            </SwipeRow>
           </li>
         ))}
       </ul>
 
       {selected.size > 0 && !readOnly && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-64">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-surface/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-64">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
             <p className="mr-auto text-sm font-medium text-slate-800">{pluralize(chosen.length, "statement")} selected</p>
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>

@@ -29,10 +29,10 @@ export function Dialog({
     <D.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <D.Trigger asChild>{trigger}</D.Trigger>}
       <D.Portal>
-        <D.Overlay className="fixed inset-0 z-50 bg-slate-950/40" />
+        <D.Overlay className="fixed inset-0 z-50 bg-black/50" />
         <D.Content
           className={cn(
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl bg-white shadow-xl outline-none",
+            "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl bg-surface shadow-xl outline-none",
             "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
             size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg",
           )}

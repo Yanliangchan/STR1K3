@@ -53,7 +53,7 @@ export function DeadlineInput({
               onClick={() => onChange({ date: d, time: time || "23:59" })}
               className={cn(
                 "min-h-10 rounded-full px-3 text-sm font-medium ring-1 ring-inset",
-                on ? "bg-navy-800 text-white ring-navy-800" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50",
+                on ? "bg-primary text-white ring-primary" : "bg-surface text-slate-700 ring-slate-300 hover:bg-slate-50",
               )}
             >
               {p.label}
@@ -73,7 +73,7 @@ export function DeadlineInput({
             min={min}
             onChange={(e) => onChange({ date: e.target.value, time })}
             aria-invalid={error ? true : undefined}
-            className="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200 aria-[invalid=true]:border-red-600"
+            className="block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-base focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200 aria-[invalid=true]:border-red-600"
           />
         </div>
         <div>
@@ -85,7 +85,7 @@ export function DeadlineInput({
             type="time"
             value={time}
             onChange={(e) => onChange({ date, time: e.target.value })}
-            className="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200"
+            className="block min-h-11 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-base focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200"
           />
         </div>
       </div>

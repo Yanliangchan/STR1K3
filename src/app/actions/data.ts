@@ -29,10 +29,19 @@ export async function voidRecordAction(input: { recordId: string; reason: string
   return authed(async ({ actor }) => done(void (await records.voidRecord(actor, input))));
 }
 export async function recordReceiptAction(input: Parameters<typeof statements.recordReceipt>[1]) {
-  return authed(async ({ actor }) => done(void (await statements.recordReceipt(actor, input))));
+  return authed(async ({ actor }) => {
+    const v = await statements.recordReceipt(actor, input);
+    return done({ undo: { type: "version", id: v.id } as statements.UndoRef });
+  });
 }
 export async function reviewStatementAction(input: Parameters<typeof statements.reviewStatement>[1]) {
-  return authed(async ({ actor }) => done(void (await statements.reviewStatement(actor, input))));
+  return authed(async ({ actor }) => {
+    const r = await statements.reviewStatement(actor, input);
+    return done({ undo: { type: "review", id: r.id } as statements.UndoRef });
+  });
+}
+export async function undoStatementAction(input: { statementId: string; ref: statements.UndoRef }) {
+  return authed(async ({ actor }) => done(await statements.undoStatementChange(actor, input)));
 }
 export async function reopenStatementAction(input: Parameters<typeof statements.reopenStatement>[1]) {
   return authed(async ({ actor }) => done(void (await statements.reopenStatement(actor, input))));

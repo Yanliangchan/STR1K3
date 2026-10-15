@@ -177,6 +177,7 @@ const STATUS_EVENTS = [
   "statement.rewrite_requested",
   "statement.reopened",
   "statement.voided",
+  "statement.undone",
 ];
 
 /**

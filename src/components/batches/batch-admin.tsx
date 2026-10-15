@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Archive, ArrowRightLeft, CheckCircle2, Pencil, Plus, RotateCcw, Trash2, Upload, UserMinus, UserPlus } from "lucide-react";
 import {
   activateBatchAction,
@@ -33,7 +32,6 @@ type CadetRow = { id: string; name: string; byteId: string | null; byteName: str
 type Checklist = { outstanding: number; notSubmitted: number; pendingReview: number; rewriteRequired: number; unassignedCadets: number };
 
 function useRun() {
-  const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +49,6 @@ function useRun() {
       }
       setFieldErrors({});
       toast("success", ok);
-      router.refresh();
       return true;
     } catch {
       setError("Could not reach the server. Nothing was changed.");

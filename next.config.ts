@@ -14,6 +14,8 @@ const securityHeaders = [
       "img-src 'self' data:",
       "font-src 'self'",
       "connect-src 'self'",
+      "worker-src 'self'",
+      "manifest-src 'self'",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",
@@ -28,7 +30,11 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "2mb" },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The service worker must always be re-checked so updates roll out promptly.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Service-Worker-Allowed", value: "/" }] },
+    ];
   },
 };
 

@@ -39,13 +39,13 @@ export async function SetupChecklist() {
               href={s.href}
               className={cn(
                 "flex min-h-14 items-center gap-3 rounded-lg px-3 py-2",
-                i === next ? "bg-navy-800 text-white" : "hover:bg-slate-50",
+                i === next ? "bg-primary text-white" : "hover:bg-slate-50",
               )}
             >
               {s.done ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-label="Done" /> : <Circle className={cn("h-5 w-5 shrink-0", i === next ? "text-white" : "text-slate-400")} aria-label="Not done" />}
               <span className="min-w-0 flex-1">
                 <span className={cn("block font-medium", s.done && "text-slate-500 line-through")}>{s.label}</span>
-                <span className={cn("block text-sm", i === next ? "text-navy-100" : "text-slate-500")}>{s.detail}</span>
+                <span className={cn("block text-sm", i === next ? "text-on-primary-muted" : "text-slate-500")}>{s.detail}</span>
               </span>
               <ChevronRight className="h-5 w-5 shrink-0 opacity-60" aria-hidden />
             </Link>

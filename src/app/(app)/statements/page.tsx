@@ -89,11 +89,11 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
               aria-current={active ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-medium",
-                active ? "bg-navy-800 text-white" : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200",
+                active ? "bg-primary text-white" : "bg-surface text-slate-700 ring-1 ring-inset ring-slate-200",
               )}
             >
               {t.label}
-              <span className={cn("tabular-nums", active ? "text-navy-100" : "text-slate-500")}>{t.n}</span>
+              <span className={cn("tabular-nums", active ? "text-on-primary-muted" : "text-slate-500")}>{t.n}</span>
             </Link>
           );
         })}
@@ -122,7 +122,7 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
           </FilterField>
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-800">
-          <input type="checkbox" name="voided" value="1" defaultChecked={sp.voided === "1"} className="h-5 w-5 accent-navy-700" />
+          <input type="checkbox" name="voided" value="1" defaultChecked={sp.voided === "1"} className="h-5 w-5 accent-primary" />
           Include voided
         </label>
       </FilterBar>

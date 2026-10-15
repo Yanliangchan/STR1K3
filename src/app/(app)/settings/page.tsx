@@ -35,7 +35,7 @@ export default async function SettingsPage() {
             users={users.map((u) => ({ id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin, active: u.active, lastLogin: u.lastLoginAt ? formatDateTime(u.lastLoginAt) : "never" }))}
           />
         ) : (
-          <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">Only administrators can manage instructor accounts.</p>
+          <p className="rounded-xl border border-slate-200 bg-surface p-4 text-sm text-slate-600">Only administrators can manage instructor accounts.</p>
         )}
       </section>
     </div>

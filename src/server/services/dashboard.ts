@@ -33,7 +33,7 @@ export type OutstandingCadet = {
 export async function outstandingByCadet(batchId: string, now = new Date()) {
   const rows = await prisma.statement.findMany({
     where: { batchId, voided: false, status: { in: ["NOT_SUBMITTED", "PENDING_REVIEW", "REWRITE_REQUIRED"] } },
-    include: { cadet: { include: { byte: true } }, _count: { select: { versions: true } } },
+    include: { cadet: { include: { byte: true } }, _count: { select: { versions: { where: { retractedAt: null } } } } },
   });
   const byCadet = new Map<string, OutstandingCadet>();
   for (const s of rows) {
@@ -152,8 +152,8 @@ export async function insights(batchId: string, now = new Date()): Promise<Insig
   const prevStart = parseISODate(addDaysISO(today, -13));
   const [statements, versions, reviews, recentRecords, allRecords, cadets] = await Promise.all([
     prisma.statement.findMany({ where: { batchId, voided: false }, select: { status: true, dueAt: true, lastReceivedAt: true } }),
-    prisma.statementVersion.findMany({ where: { statement: { batchId, voided: false } }, select: { receivedAt: true, dueAt: true } }),
-    prisma.statementReview.findMany({ where: { statement: { batchId, voided: false } }, select: { outcome: true } }),
+    prisma.statementVersion.findMany({ where: { retractedAt: null, statement: { batchId, voided: false } }, select: { receivedAt: true, dueAt: true } }),
+    prisma.statementReview.findMany({ where: { retractedAt: null, statement: { batchId, voided: false } }, select: { outcome: true } }),
     prisma.record.findMany({ where: { batchId, status: "ACTIVE", occurredOn: { gte: prevStart } }, select: { occurredOn: true } }),
     prisma.record.findMany({ where: { batchId, status: "ACTIVE" }, select: { category: { select: { name: true } }, type: true, cadet: { select: { byteId: true, byte: { select: { name: true } } } } } }),
     prisma.cadet.groupBy({ by: ["byteId"], where: { batchId, status: "ACTIVE" }, _count: true }),

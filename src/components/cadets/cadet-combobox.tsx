@@ -200,7 +200,7 @@ export function CadetCombobox({
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           className={cn(
-            "block min-h-12 w-full rounded-lg border bg-white pl-10 pr-10 text-base text-slate-900 placeholder:text-slate-400",
+            "block min-h-12 w-full rounded-lg border bg-surface pl-10 pr-10 text-base text-slate-900 placeholder:text-slate-400",
             "focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200",
             error ? "border-red-600" : "border-slate-300",
           )}
@@ -225,7 +225,7 @@ export function CadetCombobox({
             role="listbox"
             aria-multiselectable="true"
             aria-label="Matching cadets"
-            className="absolute inset-x-0 top-full z-30 mt-1 max-h-[min(50dvh,22rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            className="absolute inset-x-0 top-full z-30 mt-1 max-h-[min(50dvh,22rem)] overflow-y-auto rounded-xl border border-slate-200 bg-surface py-1 shadow-lg"
           >
             {results.map((c, i) => {
               const idx = i;
@@ -241,7 +241,7 @@ export function CadetCombobox({
                   onMouseEnter={() => setActive(idx)}
                   className={cn("flex min-h-12 cursor-pointer items-center gap-3 px-3 text-sm", active === idx && "bg-navy-50")}
                 >
-                  <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded border", isSel ? "border-navy-700 bg-navy-700 text-white" : "border-slate-400")}>
+                  <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded border", isSel ? "border-primary bg-primary text-white" : "border-slate-400")}>
                     {isSel && <Check className="h-3.5 w-3.5" aria-hidden />}
                   </span>
                   <span className="flex-1 text-slate-900">
@@ -265,7 +265,7 @@ export function CadetCombobox({
               </li>
             )}
             {results.length === 0 && <li className="px-3 py-4 text-center text-sm text-slate-500">No cadet matches “{q}”.</li>}
-            <li role="presentation" className="sticky bottom-0 border-t border-slate-100 bg-white p-2">
+            <li role="presentation" className="sticky bottom-0 border-t border-slate-100 bg-surface p-2">
               <button
                 type="button"
                 onPointerDown={(e) => e.preventDefault()}
@@ -274,7 +274,7 @@ export function CadetCombobox({
                   setQ("");
                   inputRef.current?.blur();
                 }}
-                className="min-h-11 w-full rounded-lg bg-navy-800 text-sm font-medium text-white"
+                className="min-h-11 w-full rounded-lg bg-primary text-sm font-medium text-white"
               >
                 Done{chosen.length ? ` · ${chosen.length} selected` : ""}
               </button>

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, FileText } from "lucide-react";
 import { createEntriesAction } from "@/app/actions/data";
+import { addToOutbox } from "@/lib/outbox";
+import type { CreateEntriesInput } from "@/server/services/entries";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { CadetCombobox } from "@/components/cadets/cadet-combobox";
@@ -121,7 +122,6 @@ export function EntryForm({
   fromParams: boolean;
   today: string;
 }) {
-  const router = useRouter();
   const toast = useToast();
   const draftKey = `str1k3:draft:v2:${batch.id}`;
   const [s, setS] = useState<FormState>(() => blank(initialKind, initialCadetIds, today));
@@ -132,6 +132,7 @@ export function EntryForm({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<Success | null>(null);
+  const [queued, setQueued] = useState<string | null>(null);
   const [showOverrides, setShowOverrides] = useState(false);
   const submittingRef = useRef(false);
 
@@ -278,8 +279,7 @@ export function EntryForm({
       const c = { description: clean(o.description), notes: clean(o.notes) };
       if (c.description || c.notes) overrides[id] = c;
     }
-    try {
-      const res = await createEntriesAction({
+    const payload: CreateEntriesInput = {
         idempotencyKey: s.idempotencyKey,
         batchId: batch.id,
         kind: s.kind,
@@ -299,7 +299,26 @@ export function EntryForm({
               ? { mode: "existing", occurrenceId: s.occurrenceId }
               : { mode: "none" },
         overrides,
-      });
+      };
+    const names = selected.map((c) => c.name);
+    const summary = `${pluralize(selected.length, KIND_COPY[s.kind].unit)} for ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` and ${names.length - 2} more` : ""}`;
+    const queueOffline = () => {
+      addToOutbox({ key: s.idempotencyKey, payload, summary });
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {}
+      setReviewOpen(false);
+      setDirty(false);
+      setQueued(summary);
+    };
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      queueOffline();
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+    try {
+      const res = await createEntriesAction(payload);
       if (!res.ok) {
         setReviewOpen(false);
         setErrors(res.fieldErrors ?? {});
@@ -323,20 +342,36 @@ export function EntryForm({
         occurrenceId: res.data.occurrenceId,
       });
       toast("success", `${pluralize(res.data.created.length, KIND_COPY[s.kind].unit)} saved.`);
-      router.refresh();
     } catch {
       // Network failure: the request may or may not have reached the server.
-      // Keeping the same idempotency key makes a retry safe.
-      setReviewOpen(false);
-      setFormError({
-        message:
-          "Could not reach the server. Your entry is kept on this device — check your connection and press Create again. It will not be duplicated.",
-        code: "NETWORK",
-      });
+      // Queue it with the same idempotency key; resending can never duplicate.
+      queueOffline();
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
+  }
+
+  if (queued) {
+    return (
+      <Card className="p-5" data-testid="entry-queued">
+        <h2 className="text-lg font-semibold text-slate-900">Saved on this device</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          No connection right now. <strong>{queued}</strong> will be sent automatically as soon as you&apos;re back online — you don&apos;t need to do anything.
+          It can never be saved twice.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            onClick={() => {
+              setQueued(null);
+              setS({ ...blank(s.kind, [], today), categoryId: rememberedCategory(s.kind) });
+            }}
+          >
+            Record another
+          </Button>
+        </div>
+      </Card>
+    );
   }
 
   if (success) {
@@ -470,7 +505,7 @@ export function EntryForm({
               key={k}
               className={cn(
                 "flex min-h-12 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold",
-                s.kind === k ? "border-navy-700 bg-navy-800 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+                s.kind === k ? "border-primary bg-primary text-white" : "border-slate-300 bg-surface text-slate-700 hover:bg-slate-50",
               )}
             >
               <input type="radio" name="kind" value={k} checked={s.kind === k} onChange={() => update({ kind: k })} className="sr-only" />
@@ -548,7 +583,7 @@ export function EntryForm({
                   }
                   className={cn(
                     "max-w-full truncate rounded-full px-3 py-2 text-left text-sm ring-1 ring-inset",
-                    s.description === r.description ? "bg-navy-800 text-white ring-navy-800" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50",
+                    s.description === r.description ? "bg-primary text-white ring-primary" : "bg-surface text-slate-700 ring-slate-300 hover:bg-slate-50",
                   )}
                 >
                   {r.description}
@@ -602,7 +637,7 @@ export function EntryForm({
                 <input
                   type="radio"
                   name="occ"
-                  className="h-5 w-5 accent-navy-700"
+                  className="h-5 w-5 accent-primary"
                   checked={s.occurrenceMode === o.v}
                   onChange={() => update({ occurrenceMode: o.v as FormState["occurrenceMode"] })}
                 />
@@ -672,7 +707,7 @@ export function EntryForm({
       )}
 
       {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-64">
+      <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-surface/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-64">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <p className="min-w-0 flex-1 text-sm text-slate-700">
             <strong>{selected.length}</strong> {selected.length === 1 ? "cadet" : "cadets"} · {copy.title}

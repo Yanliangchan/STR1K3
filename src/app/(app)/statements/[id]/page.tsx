@@ -32,7 +32,7 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
     orderBy: { createdAt: "desc" },
   });
   const editable = s.batch.status === "OPEN" && !s.voided;
-  const latest = s.versions[0] ?? null;
+  const latest = s.versions.find((v) => !v.retractedAt) ?? null;
   const overdue = isOverdue(s);
   const now = new Date();
   const orphanReviews = s.reviews.filter((r) => !r.versionId);
@@ -117,22 +117,25 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
           <ol className="space-y-3" data-testid="versions">
             {s.versions.map((v, i) => {
               const late = v.dueAt ? v.receivedAt > v.dueAt : false;
+              const activeIdx = s.versions.filter((x) => !x.retractedAt).findIndex((x) => x.id === v.id);
+              const label = v.retractedAt ? "Hand-in recorded in error" : activeIdx === s.versions.filter((x) => !x.retractedAt).length - 1 ? "Original statement" : `Rewrite ${s.versions.filter((x) => !x.retractedAt).length - 1 - activeIdx}`;
               return (
                 <li key={v.id}>
-                  <Card className={cn("p-4", i > 0 && "bg-slate-50")}>
+                  <Card className={cn("p-4", (i > 0 || v.retractedAt) && "bg-slate-50", v.retractedAt && "opacity-70")}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-900">{v.versionNumber === 1 ? "Original statement" : `Rewrite ${v.versionNumber - 1}`}</p>
-                      {v.dueAt && (late ? <Badge tone="red">Late</Badge> : <Badge tone="green">On time</Badge>)}
+                      <p className={cn("font-semibold text-slate-900", v.retractedAt && "line-through")}>{label}</p>
+                      {v.retractedAt ? <Badge>Undone</Badge> : v.dueAt && (late ? <Badge tone="red">Late</Badge> : <Badge tone="green">On time</Badge>)}
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
                       Handed in {formatDateTime(v.receivedAt)}
                       {v.dueAt && <> · deadline {formatDeadline(v.dueAt)}</>} · recorded by {v.recordedBy.name}
                     </p>
                     {v.reviews.map((r) => (
-                      <div key={r.id} className={cn("mt-3 rounded-lg border-l-4 px-3 py-2 text-sm", r.outcome === "ACCEPTED" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50")}>
-                        <p className="font-medium">
+                      <div key={r.id} className={cn("mt-3 rounded-lg border-l-4 px-3 py-2 text-sm", r.retractedAt ? "border-slate-300 bg-slate-100 opacity-70" : r.outcome === "ACCEPTED" ? "border-emerald-500 bg-emerald-50" : "border-amber-500 bg-amber-50")}>
+                        <p className={cn("font-medium", r.retractedAt && "line-through")}>
                           {r.outcome === "ACCEPTED" ? "Accepted" : "Rewrite required"} · {r.reviewedBy.name} · {formatDateTime(r.reviewedAt)}
                         </p>
+                        {r.retractedAt && <p className="text-xs text-slate-600">Undone {formatDateTime(r.retractedAt)}</p>}
                         {r.newDueAt && <p className="mt-0.5 text-slate-800">New deadline {formatDeadline(r.newDueAt)}</p>}
                         {r.feedback && <p className="mt-0.5 whitespace-pre-wrap text-slate-800">Feedback: {r.feedback}</p>}
                       </div>

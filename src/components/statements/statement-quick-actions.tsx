@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { StatementStatus } from "@prisma/client";
 import { CheckCircle2, Inbox, PenLine } from "lucide-react";
 import { recordReceiptAction, reviewStatementAction } from "@/app/actions/data";
@@ -12,6 +11,8 @@ import { Alert } from "@/components/ui/misc";
 import { useToast } from "@/components/ui/toast";
 import { DeadlineInput } from "./deadline-input";
 import type { ActionResult } from "@/server/action";
+import type { UndoRef } from "@/server/services/statements";
+import { useUndoToast } from "./use-undoable";
 
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -26,17 +27,14 @@ function addDays(iso: string, n: number) {
 export function StatementQuickActions({
   id,
   status,
-  versions,
   cadetName,
   today,
 }: {
   id: string;
   status: StatementStatus;
-  versions: number;
   cadetName: string;
   today: string;
 }) {
-  const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -44,7 +42,8 @@ export function StatementQuickActions({
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function run(key: string, fn: () => Promise<ActionResult<unknown>>, ok: string) {
+  const undoToast = useUndoToast();
+  async function run(key: string, fn: () => Promise<ActionResult<{ undo?: UndoRef } | unknown>>, ok: string) {
     if (busy) return false;
     setBusy(key);
     setError(null);
@@ -55,8 +54,7 @@ export function StatementQuickActions({
         else toast("error", res.error);
         return false;
       }
-      toast("success", ok);
-      router.refresh();
+      undoToast(ok, id, (res.data as { undo?: UndoRef } | undefined)?.undo);
       return true;
     } catch {
       toast("error", "Could not reach the server. Nothing was changed.");
@@ -85,7 +83,7 @@ export function StatementQuickActions({
           <Button
             size="sm"
             loading={busy === "acc"}
-            onClick={() => run("acc", () => reviewStatementAction({ statementId: id, outcome: "ACCEPTED", expectedVersion: versions || undefined }), `${cadetName}: accepted.`)}
+            onClick={() => run("acc", () => reviewStatementAction({ statementId: id, outcome: "ACCEPTED" }), `${cadetName}: accepted.`)}
             data-testid="quick-accept"
           >
             <CheckCircle2 className="h-4 w-4" aria-hidden /> Accept
@@ -126,7 +124,6 @@ export function StatementQuickActions({
                           feedback,
                           newDueDate: deadline.date,
                           newDueTime: deadline.time,
-                          expectedVersion: versions || undefined,
                         }),
                       `Rewrite required from ${cadetName}.`,
                     );

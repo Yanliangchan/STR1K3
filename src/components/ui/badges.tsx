@@ -21,9 +21,9 @@ export function StatusBadge({ status, className }: { status: StatementStatus; cl
 }
 
 const typeStyle = {
-  NOR: "bg-navy-800 text-white",
-  CROW: "bg-rose-800 text-white",
-  STATEMENT: "bg-white text-slate-700 ring-1 ring-inset ring-slate-300",
+  NOR: "bg-primary text-white",
+  CROW: "bg-crow text-white",
+  STATEMENT: "bg-surface text-slate-700 ring-1 ring-inset ring-slate-300",
 };
 
 export function TypeBadge({ type, className }: { type: "NOR" | "CROW" | "STATEMENT"; className?: string }) {
