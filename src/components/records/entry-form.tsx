@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronDown, FileText } from "lucide-react";
 import { createEntriesAction } from "@/app/actions/data";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
@@ -37,7 +37,15 @@ type FormState = {
   idempotencyKey: string;
 };
 
-type Success = { kind: Kind; created: { id: string; cadetId: string; cadetName: string }[]; replayed: boolean };
+type Success = {
+  kind: Kind;
+  created: { id: string; cadetId: string; cadetName: string }[];
+  replayed: boolean;
+  description: string;
+  occurrenceId: string | null;
+};
+type QuickPick = { description: string; categoryId: string | null };
+const lastCatKey = (kind: Kind) => `str1k3:lastCategory:${kind}`;
 
 const KIND_COPY: Record<Kind, { title: string; descLabel: string; descHint: string; unit: string }> = {
   NOR: {
@@ -97,6 +105,7 @@ export function EntryForm({
   roster,
   categories,
   occurrences,
+  recent,
   initialKind,
   initialCadetIds,
   fromParams,
@@ -106,6 +115,7 @@ export function EntryForm({
   roster: Cadet[];
   categories: { id: string; name: string; recordType: "NOR" | "CROW" }[];
   occurrences: { id: string; title: string; date: string | null; count: number }[];
+  recent: Record<Kind, QuickPick[]>;
   initialKind: Kind;
   initialCadetIds: string[];
   fromParams: boolean;
@@ -128,6 +138,23 @@ export function EntryForm({
   const byId = useMemo(() => new Map(roster.map((c) => [c.id, c])), [roster]);
   const selected = s.cadetIds.map((id) => byId.get(id)).filter((c): c is Cadet => !!c);
   const kindCategories = categories.filter((c) => c.recordType === s.kind);
+  // Pre-select the category used last time for this record type (per device).
+  function rememberedCategory(kind: Kind) {
+    if (kind === "STATEMENT") return "";
+    try {
+      const id = localStorage.getItem(lastCatKey(kind));
+      return id && categories.some((c) => c.id === id && c.recordType === kind) ? id : "";
+    } catch {
+      return "";
+    }
+  }
+  useEffect(() => {
+    if (!s.categoryId && s.kind !== "STATEMENT") {
+      const id = rememberedCategory(s.kind);
+      if (id) setS((prev) => ({ ...prev, categoryId: prev.categoryId || id }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const copy = KIND_COPY[s.kind];
 
   // Draft handling (per-device convenience; the server is the source of truth).
@@ -172,7 +199,7 @@ export function EntryForm({
         if (prev.occurrenceMode === "new" && patch.cadetIds.length <= 1) next.occurrenceMode = "none";
         next.overrides = Object.fromEntries(Object.entries(prev.overrides).filter(([id]) => patch.cadetIds!.includes(id)));
       }
-      if (patch.kind && patch.kind !== prev.kind) next.categoryId = "";
+      if (patch.kind && patch.kind !== prev.kind) next.categoryId = patch.categoryId ?? rememberedCategory(patch.kind);
       return next;
     });
     setDirty(true);
@@ -235,7 +262,9 @@ export function EntryForm({
       setFormError({ message: "Please correct the highlighted fields." });
       return;
     }
-    setReviewOpen(true);
+    // One cadet: create straight away. Several cadets: confirm the bulk action first.
+    if (selected.length === 1) void submit();
+    else setReviewOpen(true);
   }
 
   async function submit() {
@@ -283,7 +312,16 @@ export function EntryForm({
       } catch {}
       setReviewOpen(false);
       setDirty(false);
-      setSuccess({ kind: s.kind, created: res.data.created, replayed: res.data.replayed });
+      try {
+        if (s.kind !== "STATEMENT" && s.categoryId) localStorage.setItem(lastCatKey(s.kind), s.categoryId);
+      } catch {}
+      setSuccess({
+        kind: s.kind,
+        created: res.data.created,
+        replayed: res.data.replayed,
+        description: s.description.trim(),
+        occurrenceId: res.data.occurrenceId,
+      });
       toast("success", `${pluralize(res.data.created.length, KIND_COPY[s.kind].unit)} saved.`);
       router.refresh();
     } catch {
@@ -329,15 +367,51 @@ export function EntryForm({
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <p className="mt-4 text-sm font-medium text-slate-800">What next?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {!isStatement && (
+                <Button
+                  onClick={() => {
+                    const ids = success.created.map((c) => c.cadetId);
+                    setSuccess(null);
+                    setDraftNotice(null);
+                    setS({
+                      ...blank("STATEMENT", ids, today),
+                      description: success.description.slice(0, 500),
+                      occurrenceMode: success.occurrenceId ? "existing" : ids.length > 1 ? "new" : "none",
+                      occurrenceId: success.occurrenceId ?? "",
+                    });
+                    setDirty(true);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  data-testid="followup-statements"
+                >
+                  <FileText className="h-4 w-4" aria-hidden />
+                  Request statement{success.created.length === 1 ? "" : "s"} from {success.created.length === 1 ? success.created[0]!.cadetName : `these ${success.created.length} cadets`}
+                </Button>
+              )}
               <Button
+                variant={isStatement ? "primary" : "secondary"}
                 onClick={() => {
+                  const ids = success.created.map((c) => c.cadetId);
                   setSuccess(null);
-                  setS(blank(success.kind, [], today));
                   setDraftNotice(null);
+                  setS({ ...blank(isStatement ? "NOR" : success.kind, ids, today), categoryId: rememberedCategory(isStatement ? "NOR" : success.kind) });
+                  window.scrollTo({ top: 0 });
                 }}
               >
-                Create another
+                Another record for the same cadet{success.created.length === 1 ? "" : "s"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSuccess(null);
+                  setS({ ...blank(success.kind, [], today), categoryId: rememberedCategory(success.kind) });
+                  setDraftNotice(null);
+                  window.scrollTo({ top: 0 });
+                }}
+              >
+                New {KIND_COPY[success.kind].title}, other cadets
               </Button>
               <Link href={isStatement ? "/statements" : "/records"} className={buttonClasses("outline")}>
                 {isStatement ? "Statement queue" : "All records"}
@@ -456,6 +530,32 @@ export function EntryForm({
               </Select>
             )}
           </Field>
+        )}
+
+        {recent[s.kind].length > 0 && (
+          <div>
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">Recently used — tap to fill</p>
+            <div className="-mx-1 flex flex-wrap gap-1.5" data-testid="quick-picks">
+              {recent[s.kind].map((r) => (
+                <button
+                  key={r.description}
+                  type="button"
+                  onClick={() =>
+                    update({
+                      description: r.description,
+                      ...(r.categoryId && kindCategories.some((c) => c.id === r.categoryId) ? { categoryId: r.categoryId } : {}),
+                    })
+                  }
+                  className={cn(
+                    "max-w-full truncate rounded-full px-3 py-2 text-left text-sm ring-1 ring-inset",
+                    s.description === r.description ? "bg-navy-800 text-white ring-navy-800" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50",
+                  )}
+                >
+                  {r.description}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         <Field label={copy.descLabel} required hint={copy.descHint} error={errors.description}>
@@ -577,8 +677,8 @@ export function EntryForm({
           <p className="min-w-0 flex-1 text-sm text-slate-700">
             <strong>{selected.length}</strong> {selected.length === 1 ? "cadet" : "cadets"} · {copy.title}
           </p>
-          <Button type="submit" size="lg" data-testid="review-entries">
-            Review
+          <Button type="submit" size="lg" loading={submitting && !reviewOpen} data-testid="review-entries">
+            {selected.length === 1 ? `Create ${copy.unit}` : "Review"}
           </Button>
         </div>
       </div>

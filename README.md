@@ -12,6 +12,9 @@ Cadets have no accounts. Everything is entered by instructors.
 
 | Area | What it does |
 |---|---|
+| **Find anything, fast** | One search (header icon, the bar on Home, or `/` / Ctrl+K on desktop) finds cadets, statements, records **and pages**. Each cadet result has **NOR / CROW / Stmt** buttons to start a record for them straight away; typing "stats" or "export" jumps to that page. Recently viewed cadets show when the box is empty. Press `n` anywhere for a new record. |
+| **Fewer taps** | <ul><li>Statement actions (**Handed in / Accept / Rewrite**) appear wherever a statement is listed: Home, the cadet profile and the queue.</li><li>Roster selection offers **+ NOR / + CROW / Statement** directly.</li><li>A single-cadet record is created in one tap. The confirm step is kept for bulk.</li><li>**Recently used descriptions** are one-tap chips that also fill the category, and the last category used for each type is remembered.</li><li>After saving NORs/CROWs: **Request statements from these cadets** (subject and occurrence carried over) or **Another record for the same cadets**.</li></ul> |
+| **Self-guiding** | Until there is an active batch with cadets, Home shows a **setup checklist** with the next step highlighted. |
 | **Sign-in** | Email + password (scrypt-hashed). Sessions are database-backed with HTTP-only cookies: 7 days idle, 30 days maximum (both configurable). Instructors can sign out other devices. Failed sign-ins are rate-limited. Administrators reset passwords, and the instructor must choose a new one at next sign-in. |
 | **Active batch** | Exactly one active batch, stored in a database singleton with a unique constraint. The app always opens into it. Changing it is an explicit action: you type the batch name to confirm, and the change is audited. A new batch is never activated automatically. |
 | **Batch management** | Create and edit batches and bytes, add or remove cadets, assign bytes in bulk, transfer cadets between batches (old records stay with the original batch), import rosters from CSV, archive a batch (with a checklist and a carry-over note when work is outstanding), and reopen a batch (with a reason). |
@@ -105,7 +108,7 @@ npm run build && E2E_DATABASE_URL=postgresql://user:pass@localhost:5432/str1k3_e
 
 Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a different Chromium binary.
 
-**Integration tests (48)** cover:
+**Integration tests (50)** cover:
 - passwords, sign-in, rate limiting, session renewal, idle and absolute expiry, logout and revocation, deactivation, and admin-only account management
 - single active batch, explicit switching, new batches starting empty, and historical isolation
 - rejection of cross-batch writes at both the service and database level
@@ -118,9 +121,10 @@ Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a differ
 - dashboard counts against the database, statistics filters, and recurring flags without double counting
 - append-only audit, no hard deletes, CSV formula injection, export scoping, and CSV import validation
 
-**End-to-end tests (6, mobile viewport)** cover:
+**End-to-end tests (8, mobile viewport)** cover:
 - the full Definition of Done workflow: sign in, land on the active batch, search and multi-select cadets, bulk-create statements, take three statements down independent paths (pending review, rewrite, accepted), check dashboard counts, cadet history and statistics, sign out and back in, switch the active batch and back, and check the activity history
 - bulk NOR creation using the type-ahead picker, with a correction that keeps the previous value
+- the search palette (name → NOR for that cadet → one-tap create → follow-up statement request, and jumping to pages by name), statement actions from Home and the cadet profile,
 - the dashboard section order and explanations, the Overdue tab with one-tap "Handed in", and the roster search surviving Back from a cadet profile
 - unauthenticated API rejection
 

@@ -115,3 +115,14 @@ export async function updateUserAction(input: Parameters<typeof users.updateUser
 export async function resetUserPasswordAction(input: { userId: string; password: string }) {
   return authed(async ({ actor }) => done(void (await users.resetUserPassword(actor, input))));
 }
+
+// ----- Command palette -----
+export async function quickSearchAction(q: string) {
+  return authed(async () => {
+    const { getActiveBatch } = await import("@/server/services/batches");
+    const { quickSearch } = await import("@/server/services/quicksearch");
+    const active = await getActiveBatch();
+    if (!active) return { cadets: [], statements: [], records: [] };
+    return quickSearch(active.id, typeof q === "string" ? q : "");
+  });
+}

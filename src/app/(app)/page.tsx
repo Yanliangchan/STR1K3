@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, FileText, Info, Plus, Search, TrendingUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, ClipboardList, FileText, Info, Plus, TrendingUp } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
 import { dashboardCounts, recentActivity } from "@/server/services/stats";
 import { flaggedCadets, insights, outstandingByCadet, type OutstandingItem } from "@/server/services/dashboard";
 import { NoActiveBatch } from "@/components/common/no-active-batch";
+import { SetupChecklist } from "@/components/common/setup-checklist";
+import { SearchTrigger } from "@/components/shell/search-trigger";
 import { BatchBanner } from "@/components/common/batch-banner";
 import { ActivityList } from "@/components/common/activity-list";
 import { Card, EmptyState, SectionTitle } from "@/components/ui/misc";
 import { OverdueBadge, StatusBadge } from "@/components/ui/badges";
 import { batchHref, cn, pluralize, truncate } from "@/lib/utils";
-import { dueRelative, formatDeadline, formatRelative } from "@/lib/dates";
+import { dueRelative, formatDeadline, formatRelative, todayISO } from "@/lib/dates";
+import { StatementQuickActions } from "@/components/statements/statement-quick-actions";
 
 export const metadata = { title: "Home" };
 
@@ -32,6 +35,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     recentActivity(ctx.batch.id, 6),
   ]);
   const t = outstanding.totals;
+  const today = todayISO(now);
   const SHOWN = 8;
 
   const summary =
@@ -62,13 +66,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     { label: "New CROW", href: "/records/new?type=CROW", Icon: Plus },
     { label: "Request statements", href: "/records/new?type=STATEMENT", Icon: FileText },
     { label: "Review statements", href: "/statements?status=PENDING_REVIEW", Icon: ClipboardList },
-    { label: "Find a cadet", href: "/cadets", Icon: Search },
   ];
 
   return (
     <div className="space-y-6">
       <BatchBanner ctx={ctx} />
+      {ctx.isActive && <SetupChecklist />}
       <h1 className="sr-only">{ctx.batch.name} dashboard</h1>
+      <SearchTrigger />
 
       <p className={cn("rounded-xl px-4 py-3 text-sm font-medium", t.overdue ? "bg-red-50 text-red-900" : t.outstanding ? "bg-navy-50 text-navy-900" : "bg-emerald-50 text-emerald-900")} data-testid="today-summary">
         {summary}
@@ -118,14 +123,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     </Link>
                     <span className="text-xs text-slate-500">{c.byteName ?? "No byte"}</span>
                   </div>
-                  <ul className="mt-1 space-y-1">
+                  <ul className="mt-1 space-y-3">
                     {c.items.map((i) => (
-                      <li key={i.id}>
+                      <li key={i.id} className="space-y-1.5">
                         <Link href={`/statements/${i.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm hover:underline">
                           {i.overdue ? <OverdueBadge /> : <StatusBadge status={i.status} />}
                           <span className={cn(i.overdue ? "font-medium text-red-900" : i.dueSoon ? "font-medium text-amber-900" : "text-slate-700")}>{itemLine(i, now)}</span>
                           <span className="w-full text-xs text-slate-500 sm:w-auto">· {truncate(i.title, 60)}</span>
                         </Link>
+                        {!ctx.readOnly && <StatementQuickActions id={i.id} status={i.status} versions={i.versions} cadetName={c.name} today={today} />}
                       </li>
                     ))}
                   </ul>

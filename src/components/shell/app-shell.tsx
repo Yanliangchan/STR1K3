@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
+import { CommandPalette } from "./command-palette";
 import {
   Activity,
   BarChart3,
@@ -53,6 +54,33 @@ export function AppShell({
     const w = window as unknown as { __str1k3Navs?: number };
     w.__str1k3Navs = (w.__str1k3Navs ?? 0) + 1;
   }, [pathname]);
+  const router = useRouter();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Keyboard shortcuts: "/" or Ctrl/Cmd+K = search, "n" = new record.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPaletteOpen(true);
+      } else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === "/") {
+          e.preventDefault();
+          setPaletteOpen(true);
+        } else if (e.key === "n") {
+          router.push("/records/new");
+        }
+      }
+    }
+    const openSearch = () => setPaletteOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("str1k3:open-search", openSearch);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("str1k3:open-search", openSearch);
+    };
+  }, [router]);
   const moreActive = pathname === "/more" || secondary.some((s) => isActive(pathname, s.href)) || pathname.startsWith("/account");
 
   return (
@@ -105,13 +133,18 @@ export function AppShell({
               {activeBatchName ?? "None set"}
             </p>
           </div>
-          <Link
-            href="/search"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
-            aria-label="Search"
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-slate-600 hover:bg-slate-100 lg:min-w-64 lg:border lg:border-slate-300 lg:bg-white lg:text-left"
+            aria-label="Search everything (shortcut: /)"
+            aria-keyshortcuts="/ Control+K"
+            data-testid="open-search"
           >
-            <Search className="h-5 w-5" />
-          </Link>
+            <Search className="h-5 w-5 shrink-0" />
+            <span className="hidden flex-1 text-sm text-slate-500 lg:inline">Search or jump to…</span>
+            <kbd className="hidden rounded border border-slate-300 px-1.5 text-xs text-slate-500 lg:inline">/</kbd>
+          </button>
           <Link
             href="/records/new"
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-navy-800 px-3 text-sm font-medium text-white hover:bg-navy-700"
@@ -121,6 +154,8 @@ export function AppShell({
           </Link>
         </div>
       </header>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       <main id="main" className="mx-auto max-w-6xl px-4 pb-28 pt-4 lg:pb-12">
         {children}

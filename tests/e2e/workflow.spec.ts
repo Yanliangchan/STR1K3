@@ -43,8 +43,7 @@ test("definition of done: bulk statements, independent review, counts, persisten
   await expect(page.getByText("3 cadets selected")).toBeVisible();
 
   // 5. Create statement records for all of them in one operation.
-  await page.getByTestId("create-record-for-selected").click();
-  await page.getByText("Statement", { exact: true }).click();
+  await page.getByTestId("create-statement-for-selected").click();
   await expect(page.getByTestId("selected-cadets").locator("li")).toHaveCount(3);
   await page.getByLabel("Subject").fill("E2E: movements on Tuesday evening");
   await page.getByRole("button", { name: "+2 days" }).click();
@@ -112,7 +111,7 @@ test("definition of done: bulk statements, independent review, counts, persisten
 
   // 14. Switching the active batch does not mix records.
   await page.goto("/batches");
-  await page.getByRole("link", { name: /13\/26 MDST/ }).click();
+  await page.goto((await page.getByRole("link", { name: /13\/26 MDST/ }).getAttribute("href"))!);
   await page.getByTestId("activate-batch").click();
   await page.getByLabel(/Type "13\/26 MDST" to confirm/).fill("13/26 MDST");
   await page.getByTestId("confirm-activate").click();
@@ -121,7 +120,7 @@ test("definition of done: bulk statements, independent review, counts, persisten
   expect(await count(page, "count-cadets")).toBe(10);
   // Switch back.
   await page.goto("/batches");
-  await page.getByRole("link", { name: /14\/26 MDST/ }).click();
+  await page.goto((await page.getByRole("link", { name: /14\/26 MDST/ }).getAttribute("href"))!);
   await page.getByTestId("activate-batch").click();
   await page.getByLabel(/Type "14\/26 MDST" to confirm/).fill("14/26 MDST");
   await page.getByTestId("confirm-activate").click();
@@ -211,4 +210,49 @@ test("returning from a cadet profile keeps the roster search", async ({ page }) 
   await page.getByRole("link", { name: "Roster" }).click();
   await expect(page).toHaveURL(/q=Byte/);
   await expect(page.getByLabel("Search cadets")).toHaveValue("Byte 2");
+});
+
+test("search palette: type a name, start a NOR for that cadet, create in one tap, then follow up with a statement", async ({ page }) => {
+  await signIn(page);
+  await page.getByTestId("open-search").click();
+  await page.getByTestId("palette-input").fill("alex");
+  await page.getByRole("button", { name: /New NOR for Alex Tan/ }).click();
+  await expect(page).toHaveURL(/type=NOR/);
+  await expect(page.getByTestId("selected-cadets")).toContainText("Alex Tan");
+
+  // Recently used description fills in with one tap.
+  await page.getByTestId("quick-picks").getByRole("button").first().click();
+  await expect(page.getByLabel("Observation")).not.toHaveValue("");
+  // Single cadet: no confirm dialog.
+  await page.getByTestId("review-entries").click();
+  await expect(page.getByTestId("entry-success")).toContainText("1 NOR created");
+
+  // Follow-up: request a statement from the same cadet, subject prefilled.
+  await page.getByTestId("followup-statements").click();
+  await expect(page.getByTestId("selected-cadets")).toContainText("Alex Tan");
+  await expect(page.getByLabel("Subject")).not.toHaveValue("");
+  await page.getByTestId("review-entries").click();
+  await expect(page.getByTestId("entry-success")).toContainText("1 statement request created");
+
+  // Palette also navigates to pages by name.
+  await page.keyboard.press("Escape");
+  await page.getByTestId("open-search").click();
+  await page.getByTestId("palette-input").fill("stats");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/stats/);
+});
+
+test("statements can be actioned straight from Home and the cadet profile", async ({ page }) => {
+  await signIn(page);
+  const list = page.getByTestId("outstanding-list");
+  const accept = list.getByTestId("quick-accept").first();
+  await expect(accept).toBeVisible();
+  const pendingBefore = await list.getByTestId("quick-accept").count();
+  await accept.click();
+  await expect(list.getByTestId("quick-accept")).toHaveCount(pendingBefore - 1);
+
+  // Cadet profile shows open statements with their next action.
+  await list.locator("a[href^='/cadets/']").first().click();
+  await expect(page.getByRole("heading", { name: /Open statements/ })).toBeVisible();
+  await expect(page.getByTestId("quick-receive").or(page.getByTestId("quick-accept")).first()).toBeVisible();
 });

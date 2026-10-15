@@ -235,9 +235,18 @@ export function RosterView({
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
               <X className="h-4 w-4" aria-hidden /> Clear
             </Button>
-            <Link href={createHref()} className={buttonClasses("primary", "md")} data-testid="create-record-for-selected">
-              Create record
-            </Link>
+            <span className="flex gap-1.5" role="group" aria-label="Create for selected cadets">
+              {(["NOR", "CROW", "STATEMENT"] as const).map((t) => (
+                <Link
+                  key={t}
+                  href={createHref(t)}
+                  className={buttonClasses(t === "STATEMENT" ? "secondary" : "primary", "md", "px-3")}
+                  data-testid={`create-${t.toLowerCase()}-for-selected`}
+                >
+                  {t === "STATEMENT" ? "Statement" : `+ ${t}`}
+                </Link>
+              ))}
+            </span>
           </div>
         </div>
       )}

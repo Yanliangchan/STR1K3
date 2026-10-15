@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { StatementStatus } from "@prisma/client";
-import { CheckCircle2, ChevronRight, Inbox, PenLine } from "lucide-react";
-import { bulkStatementAction, recordReceiptAction, reviewStatementAction } from "@/app/actions/data";
+import { ChevronRight } from "lucide-react";
+import { bulkStatementAction, reviewStatementAction } from "@/app/actions/data";
+import { StatementQuickActions } from "./statement-quick-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input } from "@/components/ui/form";
 import { Dialog } from "@/components/ui/dialog";
@@ -194,35 +195,8 @@ export function StatementQueue({ rows, batchId, readOnly, today }: { rows: Queue
                 <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
               </Link>
               {!readOnly && !r.voided && r.status !== "ACCEPTED" && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(r.status === "NOT_SUBMITTED" || r.status === "REWRITE_REQUIRED") && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      loading={busy === `rcv-${r.id}`}
-                      onClick={() =>
-                        run(`rcv-${r.id}`, () => recordReceiptAction({ statementId: r.id, expectedStatus: r.status }), `${r.cadetName}: handed in.`)
-                      }
-                      data-testid="quick-receive"
-                    >
-                      <Inbox className="h-4 w-4" aria-hidden /> Handed in
-                    </Button>
-                  )}
-                  {r.status === "PENDING_REVIEW" && (
-                    <>
-                      <Button
-                        size="sm"
-                        loading={busy === `acc-${r.id}`}
-                        onClick={() => run(`acc-${r.id}`, () => reviewStatementAction({ statementId: r.id, outcome: "ACCEPTED", expectedVersion: r.versions }), `${r.cadetName}: accepted.`)}
-                        data-testid="quick-accept"
-                      >
-                        <CheckCircle2 className="h-4 w-4" aria-hidden /> Accept
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => openRewrite({ ids: [r.id], names: [r.cadetName] })} data-testid="quick-rewrite">
-                        <PenLine className="h-4 w-4" aria-hidden /> Rewrite
-                      </Button>
-                    </>
-                  )}
+                <div className="mt-2">
+                  <StatementQuickActions id={r.id} status={r.status} versions={r.versions} cadetName={r.cadetName} today={today} />
                 </div>
               )}
             </div>

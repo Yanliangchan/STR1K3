@@ -15,6 +15,7 @@ export type OutstandingItem = {
   status: StatementStatus;
   dueAt: Date;
   lastReceivedAt: Date | null;
+  versions: number;
   overdue: boolean;
   dueSoon: boolean;
 };
@@ -32,14 +33,14 @@ export type OutstandingCadet = {
 export async function outstandingByCadet(batchId: string, now = new Date()) {
   const rows = await prisma.statement.findMany({
     where: { batchId, voided: false, status: { in: ["NOT_SUBMITTED", "PENDING_REVIEW", "REWRITE_REQUIRED"] } },
-    include: { cadet: { include: { byte: true } } },
+    include: { cadet: { include: { byte: true } }, _count: { select: { versions: true } } },
   });
   const byCadet = new Map<string, OutstandingCadet>();
   for (const s of rows) {
     const waiting = s.status !== "PENDING_REVIEW";
     const overdue = waiting && s.dueAt < now;
     const dueSoon = waiting && !overdue && s.dueAt.getTime() - now.getTime() < 24 * HOUR;
-    const item: OutstandingItem = { id: s.id, title: s.title, status: s.status, dueAt: s.dueAt, lastReceivedAt: s.lastReceivedAt, overdue, dueSoon };
+    const item: OutstandingItem = { id: s.id, title: s.title, status: s.status, dueAt: s.dueAt, lastReceivedAt: s.lastReceivedAt, versions: s._count.versions, overdue, dueSoon };
     const c = byCadet.get(s.cadetId) ?? { cadetId: s.cadetId, name: s.cadet.name, byteName: s.cadet.byte?.name ?? null, items: [], urgency: 3 };
     c.items.push(item);
     c.urgency = Math.min(c.urgency, overdue ? 0 : dueSoon ? 1 : s.status === "PENDING_REVIEW" ? 2 : 3);

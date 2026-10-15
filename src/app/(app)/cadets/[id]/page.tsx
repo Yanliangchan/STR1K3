@@ -6,7 +6,11 @@ import { orNotFound } from "@/server/context";
 import { getCadet, cadetCounts } from "@/server/services/cadets";
 import { recurringFlags } from "@/server/services/recurring";
 import { Alert, Card, EmptyState, Stat } from "@/components/ui/misc";
-import { Badge } from "@/components/ui/badges";
+import { Badge, OverdueBadge, StatusBadge } from "@/components/ui/badges";
+import { RememberCadet } from "@/components/cadets/remember-cadet";
+import { StatementQuickActions } from "@/components/statements/statement-quick-actions";
+import { isOverdue } from "@/lib/statement-utils";
+import { dueRelative, formatDeadline, todayISO } from "@/lib/dates";
 import { buttonClasses } from "@/components/ui/button";
 import { HistoryItem, type HistoryEntry } from "@/components/records/history-item";
 import { cn } from "@/lib/utils";
@@ -42,11 +46,14 @@ export default async function CadetPage({
     }),
     prisma.statement.findMany({
       where: { cadetId: cadet.id, batchId: cadet.batchId },
-      include: { createdBy: { select: { name: true } } },
+      include: { createdBy: { select: { name: true } }, _count: { select: { versions: true } } },
     }),
     cadetCounts(cadet.batchId, [cadet.id]),
     recurringFlags(cadet.batchId, { cadetId: cadet.id }),
   ]);
+  const openStatements = statements
+    .filter((st) => !st.voided && st.status !== "ACCEPTED")
+    .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
   const counts = countsMap.get(cadet.id) ?? { nor: 0, crow: 0, statements: 0, outstanding: 0, rewrite: 0 };
 
   const history: HistoryEntry[] = [
@@ -144,6 +151,35 @@ export default async function CadetPage({
             <FileText className="h-4 w-4" aria-hidden /> Statement
           </Link>
         </div>
+      )}
+
+      <RememberCadet id={cadet.id} name={cadet.name} byteName={cadet.byte?.name ?? null} />
+
+      {openStatements.length > 0 && (
+        <section aria-labelledby="open-h">
+          <h2 id="open-h" className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Open statements ({openStatements.length})
+          </h2>
+          <Card>
+            <ul className="divide-y divide-slate-100">
+              {openStatements.map((st) => (
+                <li key={st.id} className={cn("space-y-2 px-4 py-3", isOverdue(st) && "bg-red-50/40")}>
+                  <Link href={`/statements/${st.id}`} className="block hover:underline">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={st.status} />
+                      {isOverdue(st) && <OverdueBadge />}
+                      <span className="text-sm text-slate-800">{st.title}</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-600">
+                      {st.status === "PENDING_REVIEW" ? "Handed in — waiting for your review" : `Deadline ${formatDeadline(st.dueAt)} · ${dueRelative(st.dueAt)}`}
+                    </span>
+                  </Link>
+                  {!readOnly && <StatementQuickActions id={st.id} status={st.status} versions={st._count.versions} cadetName={cadet.name} today={todayISO()} />}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
       )}
 
       {flags.map((f) => (

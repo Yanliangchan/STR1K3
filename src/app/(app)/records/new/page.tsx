@@ -2,6 +2,7 @@ import { resolveBatchContext } from "@/server/context";
 import { listRoster } from "@/server/services/cadets";
 import { listCategories } from "@/server/services/categories";
 import { listOccurrences } from "@/server/services/records";
+import { recentDescriptions } from "@/server/services/quicksearch";
 import { NoActiveBatch } from "@/components/common/no-active-batch";
 import { Alert, PageHeader } from "@/components/ui/misc";
 import { EntryForm } from "@/components/records/entry-form";
@@ -15,10 +16,11 @@ export default async function NewRecordPage({ searchParams }: { searchParams: Pr
   const ctx = await resolveBatchContext(null);
   if (!ctx) return <NoActiveBatch />;
   if (ctx.readOnly) return <Alert tone="warning">The active batch is archived and read-only.</Alert>;
-  const [roster, categories, occurrences] = await Promise.all([
+  const [roster, categories, occurrences, recent] = await Promise.all([
     listRoster(ctx.batch.id),
     listCategories(),
     listOccurrences(ctx.batch.id),
+    recentDescriptions(ctx.batch.id),
   ]);
   const kind = sp.type === "CROW" || sp.type === "STATEMENT" ? sp.type : "NOR";
   const rosterIds = new Set(roster.map((r) => r.id));
@@ -43,6 +45,7 @@ export default async function NewRecordPage({ searchParams }: { searchParams: Pr
           date: o.occurredOn ? dateOnlyISO(o.occurredOn) : null,
           count: o._count.records + o._count.statements,
         }))}
+        recent={recent}
         initialKind={kind}
         initialCadetIds={initialCadetIds}
         fromParams={!!sp.cadets || !!sp.type}
