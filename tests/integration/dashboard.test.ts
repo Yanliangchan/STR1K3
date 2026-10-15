@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db";
 import { createEntries } from "@/server/services/entries";
-import { recordReceipt, reviewStatement } from "@/server/services/statements";
+import { actionNeededCount, recordReceipt, reviewStatement } from "@/server/services/statements";
 import { flaggedCadets, insights, outstandingByCadet } from "@/server/services/dashboard";
 import { createCategory } from "@/server/services/categories";
 import { updateRecurringConfig } from "@/server/services/recurring";
@@ -25,6 +25,8 @@ describe("dashboard", () => {
     const res = await outstandingByCadet(batch.id);
     expect(res.cadets.map((x) => x.cadetId)).toEqual([c.id, b.id, a.id]); // accepted cadet not listed
     expect(res.totals).toMatchObject({ outstanding: 3, overdue: 1, awaitingReview: 1 });
+    // Nav badge: overdue + handed in; not-yet-due and accepted don't count.
+    expect(await actionNeededCount(batch.id)).toBe(2);
   });
 
   it("flags cadets by distinct occurrences or statements, with reasons, using configurable thresholds", async () => {

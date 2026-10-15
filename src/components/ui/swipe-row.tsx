@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 
 /**
  * Swipe right to run the row's primary action. Vertical scrolling still works,
@@ -61,7 +62,10 @@ export function SwipeRow({
         } catch {}
       } else return;
     }
-    setDx(Math.max(0, Math.min(mx, width() * 0.8)));
+    const next = Math.max(0, Math.min(mx, width() * 0.8));
+    // Tick once when the swipe crosses the "release to act" point.
+    if ((dxRef.current >= threshold()) !== (next >= threshold())) haptic("tap");
+    setDx(next);
   }
   async function end() {
     const commit = dragging.current && dxRef.current >= threshold();

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "./command-palette";
 import { OutboxSync } from "./outbox-sync";
+import { PullToRefresh } from "./pull-to-refresh";
 import {
   Activity,
   BarChart3,
@@ -44,10 +45,13 @@ export function AppShell({
   children,
   activeBatchName,
   userName,
+  statementsBadge,
 }: {
   children: ReactNode;
   activeBatchName: string | null;
   userName: string;
+  /** Statements needing action (overdue or handed in) in the active batch. */
+  statementsBadge: number;
 }) {
   const pathname = usePathname();
   // Count in-app page views so "Back" links can safely use browser history.
@@ -88,6 +92,13 @@ export function AppShell({
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
+  // Mirror the count on the installed app's icon, where supported.
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!nav.setAppBadge) return;
+    (statementsBadge > 0 ? nav.setAppBadge(statementsBadge) : nav.clearAppBadge?.())?.catch(() => {});
+  }, [statementsBadge]);
+  const badgeFor = (href: string) => (href === "/statements" ? statementsBadge : 0);
   const moreActive = pathname === "/more" || secondary.some((s) => isActive(pathname, s.href)) || pathname.startsWith("/account");
 
   return (
@@ -114,7 +125,8 @@ export function AppShell({
               )}
             >
               <Icon className="h-5 w-5" aria-hidden />
-              {label}
+              <span className="flex-1">{label}</span>
+              <CountBadge count={badgeFor(href)} />
             </Link>
           ))}
         </nav>
@@ -164,6 +176,8 @@ export function AppShell({
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
+      <PullToRefresh />
+
       <main id="main" className="mx-auto max-w-6xl px-4 pb-28 pt-4 lg:pb-12">
         <OutboxSync />
         {children}
@@ -184,7 +198,10 @@ export function AppShell({
                     active ? "text-navy-800" : "text-slate-500",
                   )}
                 >
-                  <Icon className={cn("h-6 w-6", active && "stroke-[2.4]")} aria-hidden />
+                  <span className="relative">
+                    <Icon className={cn("h-6 w-6", active && "stroke-[2.4]")} aria-hidden />
+                    <CountBadge count={badgeFor(href)} floating />
+                  </span>
                   {label}
                 </Link>
               </li>
@@ -193,5 +210,21 @@ export function AppShell({
         </ul>
       </nav>
     </div>
+  );
+}
+
+function CountBadge({ count, floating }: { count: number; floating?: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-semibold leading-none text-black",
+        floating && "absolute -right-3 -top-1.5 ring-2 ring-surface",
+      )}
+      data-testid="statements-badge"
+    >
+      {count > 99 ? "99+" : count}
+      <span className="sr-only"> need action</span>
+    </span>
   );
 }

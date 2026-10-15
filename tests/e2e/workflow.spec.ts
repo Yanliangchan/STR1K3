@@ -189,6 +189,13 @@ test("home leads with outstanding statements and flagged cadets, with explanatio
   await expect(page.getByTestId("insights")).toContainText("Why it matters");
 });
 
+test("statements tab shows how many need action", async ({ page }) => {
+  await signIn(page);
+  const badge = page.getByTestId("statements-badge").filter({ visible: true }).first();
+  await expect(badge).toBeVisible();
+  expect(Number(await badge.innerText().then((t) => t.replace(/\D/g, "")))).toBeGreaterThan(0);
+});
+
 test("statement queue quick actions and overdue tab", async ({ page }) => {
   await signIn(page);
   await page.goto("/statements?status=OVERDUE");

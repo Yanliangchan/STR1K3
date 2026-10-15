@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { CheckCircle2, XCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/haptics";
 
 export type ToastAction = { label: string; onClick: () => void | Promise<void> };
 type Toast = { id: number; tone: "success" | "error"; message: string; action?: ToastAction };
@@ -12,6 +13,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const push = useCallback((tone: Toast["tone"], message: string, action?: ToastAction) => {
     const id = Date.now() + Math.random();
+    haptic(tone === "success" ? "success" : "warning");
     setToasts((t) => [...t.slice(-2), { id, tone, message, action }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 10000 : tone === "error" ? 8000 : 4500);
   }, []);

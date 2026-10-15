@@ -528,3 +528,14 @@ export async function undoStatementChange(actor: Actor, input: { statementId: st
   });
   return "PENDING_REVIEW" as const;
 }
+
+/** Statements needing action: overdue (waiting on cadets) or handed in (waiting on you). */
+export async function actionNeededCount(batchId: string, now = new Date()) {
+  return prisma.statement.count({
+    where: {
+      batchId,
+      voided: false,
+      OR: [{ status: "PENDING_REVIEW" }, { status: { in: ["NOT_SUBMITTED", "REWRITE_REQUIRED"] }, dueAt: { lt: now } }],
+    },
+  });
+}
