@@ -16,7 +16,7 @@ import { TypeBadge } from "@/components/ui/badges";
 import { useToast } from "@/components/ui/toast";
 import { cn, pluralize } from "@/lib/utils";
 
-type Kind = "NOR" | "CROW" | "STATEMENT";
+type Kind = "NOR" | "CROW" | "IPS" | "STATEMENT";
 type Cadet = { id: string; name: string; byteName: string | null };
 type Override = { description?: string; notes?: string };
 
@@ -27,6 +27,7 @@ type FormState = {
   time: string;
   categoryId: string;
   description: string;
+  punishment: string;
   dueDate: string;
   dueTime: string;
   notes: string;
@@ -48,26 +49,37 @@ type Success = {
 type QuickPick = { description: string; categoryId: string | null };
 const lastCatKey = (kind: Kind) => `str1k3:lastCategory:${kind}`;
 
-const KIND_COPY: Record<Kind, { title: string; descLabel: string; descHint: string; unit: string }> = {
+const KIND_COPY: Record<Kind, { title: string; descLabel: string; descHint: string; unit: string; units: string }> = {
   NOR: {
     title: "NOR",
     descLabel: "Observation",
     descHint: "What was observed. Shared by every selected cadet unless adjusted individually.",
     unit: "NOR",
+    units: "NORs",
   },
   CROW: {
     title: "CROW",
     descLabel: "Description",
     descHint: "What happened. Shared by every selected cadet unless adjusted individually.",
     unit: "CROW",
+    units: "CROWs",
+  },
+  IPS: {
+    title: "IPS",
+    descLabel: "What they did",
+    descHint: "E.g. “Late for 0600 parade”. Shared by every selected cadet unless adjusted individually.",
+    unit: "IPS",
+    units: "IPS",
   },
   STATEMENT: {
     title: "Statement",
     descLabel: "Subject",
     descHint: "What the statement is about, e.g. “Missing food from instructors’ pantry”. A statement request is not a finding of wrongdoing.",
     unit: "statement request",
+    units: "statement requests",
   },
 };
+const KINDS: Kind[] = ["NOR", "CROW", "IPS", "STATEMENT"];
 
 function newKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -81,14 +93,15 @@ function addDays(iso: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function blank(kind: Kind, cadetIds: string[], today: string): FormState {
+function blank(kind: Kind, cadetIds: string[], today: string, description = ""): FormState {
   return {
     kind,
     cadetIds,
     date: today,
     time: "",
     categoryId: "",
-    description: "",
+    description,
+    punishment: "",
     dueDate: addDays(today, 1),
     dueTime: "23:59",
     notes: "",
@@ -107,24 +120,30 @@ export function EntryForm({
   categories,
   occurrences,
   recent,
+  punishments,
   initialKind,
   initialCadetIds,
+  initialDescription = "",
   fromParams,
   today,
 }: {
   batch: { id: string; name: string };
   roster: Cadet[];
-  categories: { id: string; name: string; recordType: "NOR" | "CROW" }[];
+  categories: { id: string; name: string; recordType: "NOR" | "CROW" | "IPS" }[];
   occurrences: { id: string; title: string; date: string | null; count: number }[];
   recent: Record<Kind, QuickPick[]>;
+  /** IPS punishments already used in this batch, offered as one-tap picks. */
+  punishments: string[];
   initialKind: Kind;
   initialCadetIds: string[];
+  /** Prefilled description, e.g. from a repeat-offence suggestion. */
+  initialDescription?: string;
   fromParams: boolean;
   today: string;
 }) {
   const toast = useToast();
   const draftKey = `str1k3:draft:v2:${batch.id}`;
-  const [s, setS] = useState<FormState>(() => blank(initialKind, initialCadetIds, today));
+  const [s, setS] = useState<FormState>(() => blank(initialKind, initialCadetIds, today, initialDescription));
   const [dirty, setDirty] = useState(false);
   const [draftNotice, setDraftNotice] = useState<null | "restored" | "available">(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -166,7 +185,7 @@ export function EntryForm({
       const draft = JSON.parse(raw) as FormState;
       if (fromParams) setDraftNotice("available");
       else {
-        setS({ ...draft, cadetIds: draft.cadetIds.filter((id) => byId.has(id)) });
+        setS({ ...blank(draft.kind, [], today), ...draft, cadetIds: draft.cadetIds.filter((id) => byId.has(id)) });
         setDirty(true);
         setDraftNotice("restored");
       }
@@ -220,7 +239,7 @@ export function EntryForm({
     try {
       localStorage.removeItem(draftKey);
     } catch {}
-    setS(blank(initialKind, initialCadetIds, today));
+    setS(blank(initialKind, initialCadetIds, today, initialDescription));
     setDirty(false);
     setDraftNotice(null);
     setErrors({});
@@ -231,7 +250,7 @@ export function EntryForm({
       const raw = localStorage.getItem(draftKey);
       if (raw) {
         const draft = JSON.parse(raw) as FormState;
-        setS({ ...draft, cadetIds: draft.cadetIds.filter((id) => byId.has(id)) });
+        setS({ ...blank(draft.kind, [], today), ...draft, cadetIds: draft.cadetIds.filter((id) => byId.has(id)) });
         setDirty(true);
       }
     } catch {}
@@ -245,6 +264,7 @@ export function EntryForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) e.date = "Enter a valid date.";
     if (s.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time)) e.time = "Use HH:MM (24-hour).";
     if (s.occurrenceMode === "existing" && !s.occurrenceId) e.occurrence = "Choose an occurrence.";
+    if (s.kind === "IPS" && !s.punishment.trim()) e.punishment = "Enter the punishment given.";
     if (s.kind === "STATEMENT") {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(s.dueDate)) e.dueDate = "Set a submission deadline.";
       else if (s.dueDate < s.date) e.dueDate = "The deadline cannot be before the issue date.";
@@ -288,6 +308,7 @@ export function EntryForm({
         time: s.kind === "STATEMENT" ? null : s.time || null,
         categoryId: s.kind === "STATEMENT" ? null : s.categoryId || null,
         description: s.description,
+        punishment: s.kind === "IPS" ? s.punishment : null,
         notes: s.notes,
         referenceNo: s.kind === "STATEMENT" ? null : s.referenceNo,
         dueDate: s.kind === "STATEMENT" ? s.dueDate : null,
@@ -301,7 +322,7 @@ export function EntryForm({
         overrides,
       };
     const names = selected.map((c) => c.name);
-    const summary = `${pluralize(selected.length, KIND_COPY[s.kind].unit)} for ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` and ${names.length - 2} more` : ""}`;
+    const summary = `${pluralize(selected.length, KIND_COPY[s.kind].unit, KIND_COPY[s.kind].units)} for ${names.slice(0, 2).join(", ")}${names.length > 2 ? ` and ${names.length - 2} more` : ""}`;
     const queueOffline = () => {
       addToOutbox({ key: s.idempotencyKey, payload, summary });
       try {
@@ -341,7 +362,7 @@ export function EntryForm({
         description: s.description.trim(),
         occurrenceId: res.data.occurrenceId,
       });
-      toast("success", `${pluralize(res.data.created.length, KIND_COPY[s.kind].unit)} saved.`);
+      toast("success", `${pluralize(res.data.created.length, KIND_COPY[s.kind].unit, KIND_COPY[s.kind].units)} saved.`);
     } catch {
       // Network failure: the request may or may not have reached the server.
       // Queue it with the same idempotency key; resending can never duplicate.
@@ -382,7 +403,7 @@ export function EntryForm({
           <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-slate-900">
-              {pluralize(success.created.length, KIND_COPY[success.kind].unit)} created
+              {pluralize(success.created.length, KIND_COPY[success.kind].unit, KIND_COPY[success.kind].units)} created
             </h2>
             <p className="mt-1 text-sm text-slate-600">
               {success.replayed
@@ -499,8 +520,8 @@ export function EntryForm({
       {/* Record type */}
       <fieldset>
         <legend className="mb-2 text-sm font-medium text-slate-800">Record type</legend>
-        <div className="grid grid-cols-3 gap-2" role="radiogroup">
-          {(["NOR", "CROW", "STATEMENT"] as Kind[]).map((k) => (
+        <div className="grid grid-cols-4 gap-2" role="radiogroup">
+          {KINDS.map((k) => (
             <label
               key={k}
               className={cn(
@@ -596,6 +617,31 @@ export function EntryForm({
         <Field label={copy.descLabel} required hint={copy.descHint} error={errors.description}>
           {(p) => <Textarea {...p} rows={3} value={s.description} onChange={(e) => update({ description: e.target.value })} maxLength={4000} />}
         </Field>
+
+        {s.kind === "IPS" && (
+          <div className="space-y-2">
+            <Field label="Punishment given" required hint="What was given on the spot, e.g. “20 push-ups”." error={errors.punishment}>
+              {(p) => <Input {...p} value={s.punishment} onChange={(e) => update({ punishment: e.target.value })} maxLength={500} data-testid="ips-punishment" />}
+            </Field>
+            {punishments.length > 0 && (
+              <div className="-mx-1 flex flex-wrap gap-1.5" data-testid="punishment-picks" aria-label="Punishments used before">
+                {punishments.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => update({ punishment: p })}
+                    className={cn(
+                      "max-w-full truncate rounded-full px-3 py-2 text-left text-sm ring-1 ring-inset",
+                      s.punishment === p ? "bg-primary text-white ring-primary" : "bg-surface text-slate-700 ring-slate-300 hover:bg-slate-50",
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {s.kind === "STATEMENT" && (
           <DeadlineInput
@@ -729,7 +775,7 @@ export function EntryForm({
               Back
             </Button>
             <Button onClick={submit} loading={submitting} disabled={Object.keys(missing).length > 0} data-testid="confirm-create">
-              Create {pluralize(selected.length, copy.unit)}
+              Create {pluralize(selected.length, copy.unit, copy.units)}
             </Button>
           </>
         }
@@ -743,8 +789,7 @@ export function EntryForm({
               Record type: <TypeBadge type={s.kind} />
             </li>
             <li>
-              <strong>{selected.length}</strong> individual {copy.unit}
-              {selected.length === 1 ? "" : "s"} will be created.
+              <strong>{selected.length}</strong> individual {selected.length === 1 ? copy.unit : copy.units} will be created.
             </li>
           </ul>
           {s.kind === "STATEMENT" && (
@@ -756,6 +801,12 @@ export function EntryForm({
             <p className="font-medium text-slate-800">{copy.descLabel}</p>
             <p className="whitespace-pre-wrap text-slate-700">{s.description}</p>
           </div>
+          {s.kind === "IPS" && (
+            <div>
+              <p className="font-medium text-slate-800">Punishment given</p>
+              <p className="whitespace-pre-wrap text-slate-700">{s.punishment}</p>
+            </div>
+          )}
           {Object.keys(missing).length > 0 && (
             <Alert tone="error" title="Missing information">
               <ul className="list-disc pl-4">

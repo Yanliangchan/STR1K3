@@ -57,7 +57,7 @@ describe("dashboard", () => {
     expect(await prisma.record.count()).toBe(6); // flags never create records
   });
 
-  it("includes a repeated-category reason", async () => {
+  it("leaves a repeating category to the repeat-offence section", async () => {
     const u = await makeUser();
     const { batch, cadets } = await makeBatch(u, { cadets: 1 });
     const cat = await createCategory(u, { recordType: "NOR", name: "Punctuality" });
@@ -65,7 +65,7 @@ describe("dashboard", () => {
       await createEntries(u, { idempotencyKey: key(), batchId: batch.id, kind: "NOR", cadetIds: [cadets[0]!.id], date: d, description: "late", categoryId: cat.id });
     }
     const res = await flaggedCadets(batch.id);
-    expect(res.cadets[0]!.reasons).toContain("Punctuality (NOR) repeated 3×");
+    expect(res.cadets[0]!.reasons).toEqual(["3 separate occurrences recorded (3 NOR)"]);
   });
 
   it("insights explain findings and only appear with enough data", async () => {

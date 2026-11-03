@@ -62,7 +62,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   <Link href={batchHref(`/cadets/${c.id}`, ctx.contextParam)} className="flex min-h-12 items-center justify-between px-3 py-2 hover:bg-slate-50">
                     <span className="font-medium text-slate-900">{c.name}</span>
                     <span className="text-sm text-slate-500">
-                      {c.byteName ?? "No byte"} · NOR {c.nor} · CROW {c.crow} · Stmt {c.statements}
+                      {c.byteName ?? "No byte"} · NOR {c.nor} · CROW {c.crow}{c.ips ? ` · IPS ${c.ips}` : ""} · Stmt {c.statements}
                     </span>
                   </Link>
                 </li>

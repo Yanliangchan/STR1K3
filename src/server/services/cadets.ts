@@ -8,7 +8,7 @@ import { id, optionalText, parse, reason, requiredText } from "@/server/validati
 import { OUTSTANDING_STATUSES } from "@/lib/labels";
 import { assertBatchWritable, getBatch } from "./batches";
 
-export const ROSTER_FILTERS = ["nor", "crow", "outstanding", "rewrite", "none"] as const;
+export const ROSTER_FILTERS = ["nor", "crow", "ips", "outstanding", "rewrite", "none"] as const;
 export type RosterFilter = (typeof ROSTER_FILTERS)[number];
 
 export type RosterQuery = {
@@ -26,6 +26,7 @@ export type RosterRow = {
   byteName: string | null;
   nor: number;
   crow: number;
+  ips: number;
   statements: number;
   outstanding: number;
   rewrite: number;
@@ -46,16 +47,17 @@ export async function cadetCounts(batchId: string, cadetIds?: string[]) {
       _count: true,
     }),
   ]);
-  const map = new Map<string, { nor: number; crow: number; statements: number; outstanding: number; rewrite: number }>();
+  const map = new Map<string, { nor: number; crow: number; ips: number; statements: number; outstanding: number; rewrite: number }>();
   const get = (cid: string) => {
     let v = map.get(cid);
-    if (!v) map.set(cid, (v = { nor: 0, crow: 0, statements: 0, outstanding: 0, rewrite: 0 }));
+    if (!v) map.set(cid, (v = { nor: 0, crow: 0, ips: 0, statements: 0, outstanding: 0, rewrite: 0 }));
     return v;
   };
   for (const r of records) {
     const v = get(r.cadetId);
     if (r.type === "NOR") v.nor += r._count;
-    else v.crow += r._count;
+    else if (r.type === "CROW") v.crow += r._count;
+    else v.ips += r._count;
   }
   for (const s of statements) {
     const v = get(s.cadetId);
@@ -79,6 +81,7 @@ export async function listRoster(batchId: string, query: RosterQuery = {}): Prom
             { byte: { name: { contains: q, mode: "insensitive" } } },
             { notes: { contains: q, mode: "insensitive" } },
             { records: { some: { status: "ACTIVE", description: { contains: q, mode: "insensitive" } } } },
+            { records: { some: { status: "ACTIVE", punishment: { contains: q, mode: "insensitive" } } } },
             { records: { some: { status: "ACTIVE", category: { name: { contains: q, mode: "insensitive" } } } } },
             { statements: { some: { voided: false, title: { contains: q, mode: "insensitive" } } } },
           ],
@@ -99,6 +102,7 @@ export async function listRoster(batchId: string, query: RosterQuery = {}): Prom
     byteName: c.byte?.name ?? null,
     nor: 0,
     crow: 0,
+    ips: 0,
     statements: 0,
     outstanding: 0,
     rewrite: 0,
@@ -109,12 +113,14 @@ export async function listRoster(batchId: string, query: RosterQuery = {}): Prom
       return rows.filter((r) => r.nor > 0);
     case "crow":
       return rows.filter((r) => r.crow > 0);
+    case "ips":
+      return rows.filter((r) => r.ips > 0);
     case "outstanding":
       return rows.filter((r) => r.outstanding > 0);
     case "rewrite":
       return rows.filter((r) => r.rewrite > 0);
     case "none":
-      return rows.filter((r) => r.nor + r.crow + r.statements === 0);
+      return rows.filter((r) => r.nor + r.crow + r.ips + r.statements === 0);
     default:
       return rows;
   }

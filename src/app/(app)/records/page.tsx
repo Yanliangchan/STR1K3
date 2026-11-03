@@ -1,3 +1,4 @@
+import { isRecordType } from "@/lib/labels";
 import Link from "@/components/ui/link";
 import { ClipboardList, Plus } from "lucide-react";
 import { resolveBatchContext } from "@/server/context";
@@ -21,7 +22,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const ctx = await resolveBatchContext(sp.b);
   if (!ctx) return <NoActiveBatch />;
-  const type = sp.type === "NOR" || sp.type === "CROW" ? sp.type : undefined;
+  const type = isRecordType(sp.type) ? sp.type : undefined;
   const from = sp.from && DATE_RE.test(sp.from) ? sp.from : undefined;
   const to = sp.to && DATE_RE.test(sp.to) ? sp.to : undefined;
   const [{ rows, total }, bytes, categories] = await Promise.all([
@@ -43,6 +44,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
     { label: "All", value: undefined },
     { label: "NOR", value: "NOR" },
     { label: "CROW", value: "CROW" },
+    { label: "IPS", value: "IPS" },
   ];
   const keep = { b: ctx.contextParam ?? undefined, byte: sp.byte, category: sp.category, from, to, q: sp.q, voided: sp.voided };
 
@@ -51,7 +53,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
       <BatchBanner ctx={ctx} />
       <PageHeader
         title="Records"
-        description="NOR and CROW records. Statements are managed in the Statements tab."
+        description="NOR, CROW and IPS records. Statements are managed in the Statements tab."
         actions={
           !ctx.readOnly && ctx.isActive ? (
             <Link href={`/records/new${type ? `?type=${type}` : ""}`} className={buttonClasses("primary")}>
@@ -136,7 +138,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
       </p>
       {rows.length === 0 ? (
         <EmptyState icon={<ClipboardList className="h-10 w-10" />} title="No records found">
-          {activeCount ? "Try changing the filters." : "NORs and CROWs you create will be listed here."}
+          {activeCount ? "Try changing the filters." : "NORs, CROWs and IPS you create will be listed here."}
         </EmptyState>
       ) : (
         <Card>
@@ -151,6 +153,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
                     date: r.occurredOn,
                     category: r.category?.name ?? null,
                     description: r.description,
+                    punishment: r.punishment,
                     status: null,
                     voided: r.status === "VOIDED",
                     createdBy: r.createdBy.name,

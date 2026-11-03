@@ -13,7 +13,7 @@ export const metadata = { title: "Activity history" };
 const PAGE = 50;
 
 const GROUPS: Record<string, { label: string; where: Prisma.AuditEventWhereInput }> = {
-  records: { label: "NOR / CROW", where: { OR: [{ entityType: "Record" }, { action: "bulk.created" }] } },
+  records: { label: "NOR / CROW / IPS", where: { OR: [{ entityType: "Record" }, { action: "bulk.created" }] } },
   statements: { label: "Statements", where: { entityType: "Statement" } },
   roster: { label: "Roster & bytes", where: { entityType: { in: ["Cadet", "Byte"] } } },
   batch: { label: "Batch changes", where: { entityType: "Batch" } },

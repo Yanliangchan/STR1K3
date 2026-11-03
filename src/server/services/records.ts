@@ -40,6 +40,7 @@ export function recordWhere(batchId: string, f: RecordListQuery): Prisma.RecordW
       ? {
           OR: [
             { description: { contains: f.q, mode: "insensitive" } },
+            { punishment: { contains: f.q, mode: "insensitive" } },
             { notes: { contains: f.q, mode: "insensitive" } },
             { referenceNo: { contains: f.q, mode: "insensitive" } },
             { cadet: { name: { contains: f.q, mode: "insensitive" } } },
@@ -91,18 +92,22 @@ const correctionSchema = z.object({
     .or(z.literal("").transform(() => null)),
   categoryId: z.string().max(64).optional().nullable().transform((v) => v || null),
   description: requiredText(4000, "Enter a description."),
+  /** IPS only. */
+  punishment: optionalText(500),
   notes: optionalText(4000),
   referenceNo: optionalText(100),
   reason,
   expectedUpdatedAt: z.string().optional(),
 });
 
-/** Correct a NOR/CROW. The previous values are preserved in the audit log. */
+/** Correct a NOR/CROW/IPS. The previous values are preserved in the audit log. */
 export async function correctRecord(actor: Actor, input: z.input<typeof correctionSchema>) {
   const data = parse(correctionSchema, input);
   const rec = await getRecord(data.recordId);
   if (rec.batch.status !== "OPEN") throw readOnly();
   if (rec.status === "VOIDED") throw conflict("A voided record cannot be edited.");
+  if (rec.type === "IPS" && !data.punishment) throw invalid("Enter the punishment given.", { punishment: "Enter the punishment given." });
+  const punishment = rec.type === "IPS" ? data.punishment : null;
   if (data.expectedUpdatedAt && rec.updatedAt.toISOString() !== data.expectedUpdatedAt) {
     throw conflict("This record was changed by someone else. Reload and try again.");
   }
@@ -117,6 +122,7 @@ export async function correctRecord(actor: Actor, input: z.input<typeof correcti
     time: rec.occurredTime,
     category: rec.category?.name ?? null,
     description: rec.description,
+    punishment: rec.punishment,
     notes: rec.notes,
     referenceNo: rec.referenceNo,
   };
@@ -125,10 +131,11 @@ export async function correctRecord(actor: Actor, input: z.input<typeof correcti
     time: data.time ?? null,
     category: newCategoryName,
     description: data.description,
+    punishment,
     notes: data.notes,
     referenceNo: data.referenceNo,
   };
-  const changes = diff(before, after, ["date", "time", "category", "description", "notes", "referenceNo"]);
+  const changes = diff(before, after, ["date", "time", "category", "description", "punishment", "notes", "referenceNo"]);
   if (Object.keys(changes).length === 0) return rec;
   return prisma.$transaction(async (tx) => {
     const updated = await tx.record.update({
@@ -138,6 +145,7 @@ export async function correctRecord(actor: Actor, input: z.input<typeof correcti
         occurredTime: data.time ?? null,
         categoryId: data.categoryId,
         description: data.description,
+        punishment,
         notes: data.notes,
         referenceNo: data.referenceNo,
         updatedById: actor.id,

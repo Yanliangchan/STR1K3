@@ -24,7 +24,7 @@ export async function SetupChecklist() {
       href: firstBatch ? `/batches/${firstBatch.id}` : "/batches/new",
     },
     { done: !!active, label: "Set it as the active batch", detail: "STR1K3 then always opens straight into it.", href: firstBatch ? `/batches/${firstBatch.id}` : "/batches" },
-    { done: categories > 0, label: "Add NOR / CROW categories (optional)", detail: "E.g. Punctuality, Turnout. Makes statistics more useful.", href: "/settings" },
+    { done: categories > 0, label: "Add NOR / CROW / IPS categories (optional)", detail: "E.g. Punctuality, Turnout. Makes statistics more useful.", href: "/settings" },
   ];
   const next = steps.findIndex((s) => !s.done);
 

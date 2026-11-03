@@ -64,9 +64,14 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
           </Item>
           <Item label="Category">{rec.category?.name ?? "Uncategorised"}</Item>
           <Item label="Reference">{rec.referenceNo ?? "—"}</Item>
-          <Item label="Description" wide>
+          <Item label={rec.type === "IPS" ? "What they did" : "Description"} wide>
             <p className="whitespace-pre-wrap">{rec.description}</p>
           </Item>
+          {rec.punishment && (
+            <Item label="Punishment given" wide>
+              <p className="whitespace-pre-wrap" data-testid="record-punishment">{rec.punishment}</p>
+            </Item>
+          )}
           {rec.notes && (
             <Item label="Instructor notes" wide>
               <p className="whitespace-pre-wrap">{rec.notes}</p>
@@ -96,6 +101,7 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
                 time: rec.occurredTime,
                 categoryId: rec.categoryId,
                 description: rec.description,
+                punishment: rec.punishment,
                 notes: rec.notes,
                 referenceNo: rec.referenceNo,
                 updatedAt: rec.updatedAt.toISOString(),

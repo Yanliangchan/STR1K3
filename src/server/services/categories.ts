@@ -14,7 +14,7 @@ export async function listCategories(opts: { type?: RecordType; includeInactive?
 }
 
 export async function createCategory(actor: Actor, input: { recordType: RecordType; name: string }) {
-  const data = parse(z.object({ recordType: z.enum(["NOR", "CROW"]), name: requiredText(60, "Enter a category name.") }), input);
+  const data = parse(z.object({ recordType: z.enum(["NOR", "CROW", "IPS"]), name: requiredText(60, "Enter a category name.") }), input);
   const clash = await prisma.category.findFirst({
     where: { recordType: data.recordType, name: { equals: data.name, mode: "insensitive" } },
   });

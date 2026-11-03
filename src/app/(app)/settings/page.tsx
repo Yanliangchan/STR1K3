@@ -1,9 +1,10 @@
 import { requireSession } from "@/server/auth/current";
 import { listCategories } from "@/server/services/categories";
 import { getRecurringConfig } from "@/server/services/recurring";
+import { getRepeatConfig } from "@/server/services/repeats";
 import { listUsers } from "@/server/services/users";
 import { PageHeader, SectionTitle } from "@/components/ui/misc";
-import { CategoriesForm, RecurringForm, UsersForm } from "@/components/settings/settings-forms";
+import { CategoriesForm, MatchingForm, RecurringForm, UsersForm } from "@/components/settings/settings-forms";
 import { formatDateTime } from "@/lib/dates";
 
 export const metadata = { title: "Settings" };
@@ -11,9 +12,10 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const session = await requireSession();
   const actor = { id: session.user.id, name: session.user.name, isAdmin: session.user.isAdmin };
-  const [categories, recurring, users] = await Promise.all([
+  const [categories, recurring, matching, users] = await Promise.all([
     listCategories({ includeInactive: true }),
     getRecurringConfig(),
+    getRepeatConfig(),
     actor.isAdmin ? listUsers(actor) : Promise.resolve(null),
   ]);
   return (
@@ -26,6 +28,10 @@ export default async function SettingsPage() {
       <section>
         <SectionTitle>Review flags</SectionTitle>
         <RecurringForm {...recurring} />
+      </section>
+      <section id="matching">
+        <SectionTitle>Repeat offences</SectionTitle>
+        <MatchingForm repeats={matching.repeats} ignoredWords={matching.ignoredWords} synonyms={matching.synonyms} />
       </section>
       <section>
         <SectionTitle>Instructor accounts</SectionTitle>

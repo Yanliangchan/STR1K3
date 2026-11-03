@@ -8,6 +8,7 @@ import { createBatch, activateBatch } from "../src/server/services/batches";
 import { createCategory } from "../src/server/services/categories";
 import { createEntries } from "../src/server/services/entries";
 import { recordReceipt, reviewStatement } from "../src/server/services/statements";
+import { saveSynonymGroup } from "../src/server/services/repeats";
 import { addDaysISO, todayISO } from "../src/lib/dates";
 
 const FIRST = ["Alex", "Jordan", "Casey", "Riley", "Morgan", "Taylor", "Jamie", "Avery", "Quinn", "Rowan", "Skyler", "Reese", "Dakota", "Hayden", "Emerson", "Finley", "Harper", "Kai", "Logan", "Parker", "Sage", "Tatum", "Blake", "Cameron", "Devon", "Elliot", "Frankie", "Gray", "Indigo", "Jules"];
@@ -61,7 +62,7 @@ async function main() {
   await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "NOR", cadetIds: [cadets[0]!.id], date: addDaysISO(today, -8), description: "Late for lecture.", categoryId: cats["NOR:Punctuality"] });
   await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "NOR", cadetIds: [cadets[0]!.id], date: addDaysISO(today, -3), description: "Late returning from break.", categoryId: cats["NOR:Punctuality"] });
   await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "NOR", cadetIds: cadets.slice(5, 9).map((c) => c.id), date: addDaysISO(today, -6), description: "Bunk not made to standard during inspection.", categoryId: cats["NOR:Room inspection"], occurrence: { mode: "new", title: "Week 2 room inspection" } });
-  await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "CROW", cadetIds: [cadets[10]!.id, cadets[11]!.id], date: addDaysISO(today, -5), description: "Horseplay in the stairwell.", categoryId: cats["CROW:Safety"], occurrence: { mode: "new", title: "Stairwell incident" } });
+  const horseplay = await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "CROW", cadetIds: [cadets[10]!.id, cadets[11]!.id], date: addDaysISO(today, -5), description: "Horseplay in the stairwell.", categoryId: cats["CROW:Safety"], occurrence: { mode: "new", title: "Stairwell incident" } });
   await createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "CROW", cadetIds: [cadets[14]!.id], date: addDaysISO(today, -2), description: "Used another cadet's equipment without permission.", categoryId: cats["CROW:Property"] });
 
   const stmt = await createEntries(actor, {
@@ -92,7 +93,18 @@ async function main() {
     dueDate: addDaysISO(today, -3),
     dueTime: "22:00",
     description: "Horseplay in the stairwell",
+    occurrence: { mode: "existing", occurrenceId: horseplay.occurrenceId! },
   });
+
+  // IPS: what the cadet did and the punishment given on the spot. Two cadets repeat an offence.
+  const ips = (cadetIdx: number, daysAgo: number, description: string, punishment: string) =>
+    createEntries(actor, { idempotencyKey: key(), batchId: batch.id, kind: "IPS", cadetIds: [cadets[cadetIdx]!.id], date: addDaysISO(today, -daysAgo), description, punishment });
+  await ips(24, 9, "Late for 0630 muster.", "20 push-ups");
+  await ips(24, 4, "Lateness to weapons lesson.", "Extra 2 rounds of the parade square");
+  await ips(25, 10, "Eating in the lab.", "20 push-ups");
+  await ips(25, 7, "Caught eating snacks in the computer lab.", "Clean the lab after lesson");
+  await ips(26, 2, "Talking during lecture.", "Stand at the back of the class");
+  await saveSynonymGroup(actor, { terms: "phone, handphone, hp, mobile" });
 
   await activateBatch(actor, { batchId: batch.id, confirmName: batch.name });
   console.log("Demo data loaded. Sign in as admin@example.com or instructor@example.com with password DemoPassword123!");

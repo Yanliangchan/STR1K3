@@ -49,16 +49,17 @@ export default async function ExportPage({ searchParams }: { searchParams: Promi
             <input type="hidden" name="batchId" value={ctx.batch.id} />
             <FilterField label="Dataset">
               <select name="dataset" className={filterControl} defaultValue="records">
-                <option value="records">NOR / CROW records</option>
+                <option value="records">NOR / CROW / IPS records</option>
                 <option value="statements">Statements</option>
                 <option value="roster">Roster with counts</option>
               </select>
             </FilterField>
             <FilterField label="Record type (records only)">
               <select name="type" className={filterControl}>
-                <option value="">NOR and CROW</option>
+                <option value="">NOR, CROW and IPS</option>
                 <option value="NOR">NOR</option>
                 <option value="CROW">CROW</option>
+                <option value="IPS">IPS</option>
               </select>
             </FilterField>
             <FilterField label="Byte">

@@ -6,7 +6,6 @@ import type { StatementStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getAppConfig } from "./config";
 import { addDaysISO, parseISODate, todayISO } from "@/lib/dates";
-import { recurringFlags } from "./recurring";
 
 const HOUR = 3600_000;
 
@@ -73,14 +72,18 @@ export type FlaggedCadet = {
 
 /**
  * Cadets who meet a review threshold: many distinct NOR/CROW occurrences,
- * many statements requested, or the same category repeating. Ordered by most
- * recent activity (not by count) so the list is a review queue, not a ranking.
+ * many IPS, or many statements requested. (The same offence repeating is
+ * covered by the repeat-offence section.) Ordered by most recent activity
+ * (not by count) so the list is a review queue, not a ranking.
  */
-export async function flaggedCadets(batchId: string): Promise<{ cadets: FlaggedCadet[]; recordThreshold: number; statementThreshold: number }> {
+export async function flaggedCadets(
+  batchId: string,
+): Promise<{ cadets: FlaggedCadet[]; recordThreshold: number; statementThreshold: number; ipsThreshold: number }> {
   const cfg = await getAppConfig();
   const recordThreshold = cfg?.flagRecordThreshold ?? 3;
   const statementThreshold = cfg?.flagStatementThreshold ?? 3;
-  const [records, statements, repeat] = await Promise.all([
+  const ipsThreshold = cfg?.flagIpsThreshold ?? 3;
+  const [records, statements] = await Promise.all([
     prisma.record.findMany({
       where: { batchId, status: "ACTIVE", cadet: { status: "ACTIVE" } },
       select: { id: true, type: true, occurrenceId: true, createdAt: true, cadet: { select: { id: true, name: true, byte: { select: { name: true } } } } },
@@ -89,22 +92,24 @@ export async function flaggedCadets(batchId: string): Promise<{ cadets: FlaggedC
       where: { batchId, voided: false, cadet: { status: "ACTIVE" } },
       select: { status: true, dueAt: true, createdAt: true, cadet: { select: { id: true, name: true, byte: { select: { name: true } } } } },
     }),
-    recurringFlags(batchId),
   ]);
 
-  type Acc = { name: string; byteName: string | null; occ: Set<string>; nor: number; crow: number; stmts: number; overdue: number; last: Date };
+  type Acc = { name: string; byteName: string | null; occ: Set<string>; ipsOcc: Set<string>; nor: number; crow: number; stmts: number; overdue: number; last: Date };
   const acc = new Map<string, Acc>();
   const get = (c: { id: string; name: string; byte: { name: string } | null }) => {
     let a = acc.get(c.id);
-    if (!a) acc.set(c.id, (a = { name: c.name, byteName: c.byte?.name ?? null, occ: new Set(), nor: 0, crow: 0, stmts: 0, overdue: 0, last: new Date(0) }));
+    if (!a) acc.set(c.id, (a = { name: c.name, byteName: c.byte?.name ?? null, occ: new Set(), ipsOcc: new Set(), nor: 0, crow: 0, stmts: 0, overdue: 0, last: new Date(0) }));
     return a;
   };
   const now = new Date();
   for (const r of records) {
     const a = get(r.cadet);
-    a.occ.add(r.occurrenceId ?? `rec:${r.id}`);
-    if (r.type === "NOR") a.nor++;
-    else a.crow++;
+    if (r.type === "IPS") a.ipsOcc.add(r.occurrenceId ?? `rec:${r.id}`);
+    else {
+      a.occ.add(r.occurrenceId ?? `rec:${r.id}`);
+      if (r.type === "NOR") a.nor++;
+      else a.crow++;
+    }
     if (r.createdAt > a.last) a.last = r.createdAt;
   }
   for (const s of statements) {
@@ -112,12 +117,6 @@ export async function flaggedCadets(batchId: string): Promise<{ cadets: FlaggedC
     a.stmts++;
     if ((s.status === "NOT_SUBMITTED" || s.status === "REWRITE_REQUIRED") && s.dueAt < now) a.overdue++;
     if (s.createdAt > a.last) a.last = s.createdAt;
-  }
-  const repeatBy = new Map<string, string[]>();
-  for (const f of repeat) {
-    const list = repeatBy.get(f.cadetId) ?? [];
-    list.push(`${f.category} (${f.recordType}) repeated ${f.distinctOccurrences}×${f.needsManualReview ? " — check for duplicates" : ""}`);
-    repeatBy.set(f.cadetId, list);
   }
 
   const cadets: FlaggedCadet[] = [];
@@ -127,12 +126,12 @@ export async function flaggedCadets(batchId: string): Promise<{ cadets: FlaggedC
       const parts = [a.nor && `${a.nor} NOR`, a.crow && `${a.crow} CROW`].filter(Boolean).join(", ");
       reasons.push(`${a.occ.size} separate occurrences recorded (${parts})`);
     }
+    if (a.ipsOcc.size >= ipsThreshold) reasons.push(`${a.ipsOcc.size} separate IPS given`);
     if (a.stmts >= statementThreshold) reasons.push(`${a.stmts} statements requested${a.overdue ? `, ${a.overdue} overdue` : ""}`);
-    reasons.push(...(repeatBy.get(cadetId) ?? []));
     if (reasons.length) cadets.push({ cadetId, name: a.name, byteName: a.byteName, reasons, lastActivity: a.last });
   }
   cadets.sort((x, y) => y.lastActivity.getTime() - x.lastActivity.getTime());
-  return { cadets, recordThreshold, statementThreshold };
+  return { cadets, recordThreshold, statementThreshold, ipsThreshold };
 }
 
 export type Insight = {
@@ -155,8 +154,8 @@ export async function insights(batchId: string, now = new Date()): Promise<Insig
     prisma.statement.findMany({ where: { batchId, voided: false }, select: { status: true, dueAt: true, lastReceivedAt: true } }),
     prisma.statementVersion.findMany({ where: { retractedAt: null, statement: { batchId, voided: false } }, select: { receivedAt: true, dueAt: true } }),
     prisma.statementReview.findMany({ where: { retractedAt: null, statement: { batchId, voided: false } }, select: { outcome: true } }),
-    prisma.record.findMany({ where: { batchId, status: "ACTIVE", occurredOn: { gte: prevStart } }, select: { occurredOn: true } }),
-    prisma.record.findMany({ where: { batchId, status: "ACTIVE" }, select: { category: { select: { name: true } }, type: true, cadet: { select: { byteId: true, byte: { select: { name: true } } } } } }),
+    prisma.record.findMany({ where: { batchId, status: "ACTIVE", type: { in: ["NOR", "CROW"] }, occurredOn: { gte: prevStart } }, select: { occurredOn: true } }),
+    prisma.record.findMany({ where: { batchId, status: "ACTIVE", type: { in: ["NOR", "CROW"] } }, select: { category: { select: { name: true } }, type: true, cadet: { select: { byteId: true, byte: { select: { name: true } } } } } }),
     prisma.cadet.groupBy({ by: ["byteId"], where: { batchId, status: "ACTIVE" }, _count: true }),
   ]);
   const out: Insight[] = [];

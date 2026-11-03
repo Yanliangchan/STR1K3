@@ -1,5 +1,5 @@
 /**
- * Creating NOR / CROW records and statement requests — individually or in bulk.
+ * Creating NOR / CROW / IPS records and statement requests — individually or in bulk.
  * Every selected cadet always receives their own, independent row.
  */
 import { z } from "zod";
@@ -13,7 +13,7 @@ import { parseISODate, zonedDateTime } from "@/lib/dates";
 import { recordTypeLabel } from "@/lib/labels";
 import { truncate } from "@/lib/utils";
 
-export const ENTRY_KINDS = ["NOR", "CROW", "STATEMENT"] as const;
+export const ENTRY_KINDS = ["NOR", "CROW", "IPS", "STATEMENT"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
 
 const overrideSchema = z.object({
@@ -38,6 +38,8 @@ export const createEntriesSchema = z
       .or(z.literal("").transform(() => null)),
     categoryId: z.string().max(64).optional().nullable().transform((v) => v || null),
     description: requiredText(4000, "Enter a description."),
+    /** IPS only: the punishment given (required there). */
+    punishment: optionalText(500),
     notes: optionalText(4000),
     referenceNo: optionalText(100),
     /** Statements only: submission deadline (date + time in the app time zone). */
@@ -55,6 +57,9 @@ export const createEntriesSchema = z
   .superRefine((v, ctx) => {
     if (new Set(v.cadetIds).size !== v.cadetIds.length) {
       ctx.addIssue({ code: "custom", path: ["cadetIds"], message: "A cadet was selected twice." });
+    }
+    if (v.kind === "IPS" && !v.punishment) {
+      ctx.addIssue({ code: "custom", path: ["punishment"], message: "Enter the punishment given." });
     }
     if (v.kind === "STATEMENT") {
       if (!v.dueDate) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Set a submission deadline." });
@@ -172,9 +177,10 @@ export async function createEntries(actor: Actor, input: CreateEntriesInput): Pr
             return {
               batchId: batch.id,
               cadetId,
-              type: data.kind as "NOR" | "CROW",
+              type: data.kind as "NOR" | "CROW" | "IPS",
               categoryId: data.categoryId,
               description: o?.description ?? data.description,
+              punishment: data.kind === "IPS" ? data.punishment : null,
               notes: o?.notes ?? data.notes,
               referenceNo: data.referenceNo,
               occurredOn: date,

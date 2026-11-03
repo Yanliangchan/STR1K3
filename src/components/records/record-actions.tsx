@@ -12,11 +12,12 @@ import { ReasonDialog } from "@/components/common/reason-dialog";
 
 type Rec = {
   id: string;
-  type: "NOR" | "CROW";
+  type: "NOR" | "CROW" | "IPS";
   date: string;
   time: string | null;
   categoryId: string | null;
   description: string;
+  punishment: string | null;
   notes: string | null;
   referenceNo: string | null;
   updatedAt: string;
@@ -30,6 +31,7 @@ export function RecordActions({ rec, categories }: { rec: Rec; categories: { id:
     time: rec.time ?? "",
     categoryId: rec.categoryId ?? "",
     description: rec.description,
+    punishment: rec.punishment ?? "",
     notes: rec.notes ?? "",
     referenceNo: rec.referenceNo ?? "",
     reason: "",
@@ -107,6 +109,11 @@ export function RecordActions({ rec, categories }: { rec: Rec; categories: { id:
           <Field label="Description" required error={errors.description}>
             {(p) => <Textarea {...p} rows={3} value={v.description} onChange={(e) => setV({ ...v, description: e.target.value })} />}
           </Field>
+          {rec.type === "IPS" && (
+            <Field label="Punishment given" required error={errors.punishment}>
+              {(p) => <Input {...p} value={v.punishment} onChange={(e) => setV({ ...v, punishment: e.target.value })} maxLength={500} />}
+            </Field>
+          )}
           <Field label="Instructor notes" error={errors.notes}>
             {(p) => <Textarea {...p} rows={2} value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} />}
           </Field>

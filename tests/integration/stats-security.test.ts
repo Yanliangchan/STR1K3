@@ -29,7 +29,7 @@ describe("statistics", () => {
     expect(c.nor).toBe(await prisma.record.count({ where: { batchId: a.batch.id, type: "NOR", status: "ACTIVE" } }));
 
     const s = await statistics(a.batch.id);
-    expect(s.distribution).toEqual({ nor: 3, crow: 1, statements: 2 });
+    expect(s.distribution).toEqual({ nor: 3, crow: 1, ips: 0, statements: 2 });
     const filtered = await statistics(a.batch.id, { byteId: a.bytes[0]!.id });
     expect(filtered.distribution.nor).toBe(2); // cadets 1 and 3 are in Byte 1
     expect(s.outstanding.at(-1)?.outstanding).toBe(2);

@@ -12,6 +12,7 @@ import * as statements from "@/server/services/statements";
 import * as users from "@/server/services/users";
 import * as io from "@/server/services/importExport";
 import { updateRecurringConfig } from "@/server/services/recurring";
+import * as repeats from "@/server/services/repeats";
 
 function done<T>(v: T) {
   revalidatePath("/", "layout");
@@ -54,6 +55,14 @@ export async function voidStatementAction(input: { statementId: string; reason: 
 }
 export async function bulkStatementAction(input: Parameters<typeof statements.bulkStatementAction>[1]) {
   return authed(async ({ actor }) => done(await statements.bulkStatementAction(actor, input)));
+}
+
+// ----- Repeat offences -----
+export async function dismissRepeatAction(input: Parameters<typeof repeats.dismissRepeat>[1]) {
+  return authed(async ({ actor }) => done((await repeats.dismissRepeat(actor, input)).id));
+}
+export async function undoDismissRepeatAction(input: { dismissalId: string }) {
+  return authed(async ({ actor }) => done(void (await repeats.undoDismissRepeat(actor, input))));
 }
 
 // ----- Batches -----
@@ -114,6 +123,15 @@ export async function updateCategoryAction(input: Parameters<typeof categories.u
 }
 export async function updateRecurringAction(input: Parameters<typeof updateRecurringConfig>[1]) {
   return authed(async ({ actor }) => done(void (await updateRecurringConfig(actor, input))));
+}
+export async function updateMatchingAction(input: Parameters<typeof repeats.updateMatchingConfig>[1]) {
+  return authed(async ({ actor }) => done(void (await repeats.updateMatchingConfig(actor, input))));
+}
+export async function saveSynonymGroupAction(input: Parameters<typeof repeats.saveSynonymGroup>[1]) {
+  return authed(async ({ actor }) => done(void (await repeats.saveSynonymGroup(actor, input))));
+}
+export async function deleteSynonymGroupAction(input: { id: string }) {
+  return authed(async ({ actor }) => done(void (await repeats.deleteSynonymGroup(actor, input))));
 }
 export async function createUserAction(input: Parameters<typeof users.createUser>[1]) {
   return authed(async ({ actor }) => done(void (await users.createUser(actor, input))));

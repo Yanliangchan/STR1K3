@@ -156,7 +156,7 @@ export async function commitImport(
 export const exportSchema = z.object({
   batchId: z.string().min(1),
   dataset: z.enum(["records", "statements", "roster"]),
-  type: z.enum(["NOR", "CROW"]).optional(),
+  type: z.enum(["NOR", "CROW", "IPS"]).optional(),
   byteId: z.string().optional(),
   cadetId: z.string().optional(),
   categoryId: z.string().optional(),
@@ -190,10 +190,10 @@ export async function buildExport(actor: Actor, input: ExportInput) {
     });
     count = rows.length;
     csv = toCsv(
-      ["Record ID", "Batch", "Type", "Cadet", "Byte", "Date", "Time", "Category", "Description", "Notes", "Reference", "Occurrence", "Status", "Void reason", "Created at", "Created by", "Last updated", "Updated by"],
+      ["Record ID", "Batch", "Type", "Cadet", "Byte", "Date", "Time", "Category", "Description", "Punishment (IPS)", "Notes", "Reference", "Occurrence", "Status", "Void reason", "Created at", "Created by", "Last updated", "Updated by"],
       rows.map((r) => [
         r.id, batch.name, r.type, r.cadet.name, r.cadet.byte?.name ?? "", dateOnlyISO(r.occurredOn), r.occurredTime ?? "",
-        r.category?.name ?? "", r.description, r.notes ?? "", r.referenceNo ?? "", r.occurrence?.title ?? "", r.status,
+        r.category?.name ?? "", r.description, r.punishment ?? "", r.notes ?? "", r.referenceNo ?? "", r.occurrence?.title ?? "", r.status,
         r.voidReason ?? "", r.createdAt, r.createdBy.name, r.updatedAt, r.updatedBy?.name ?? "",
       ]),
     );
@@ -237,8 +237,8 @@ export async function buildExport(actor: Actor, input: ExportInput) {
     const rows = await listRoster(batch.id, { byteId: input.byteId, includeInactive: true });
     count = rows.length;
     csv = toCsv(
-      ["Cadet ID", "Batch", "Name", "Byte", "Status", "NORs", "CROWs", "Statements", "Outstanding statements"],
-      rows.map((r) => [r.id, batch.name, r.name, r.byteName ?? "", r.status, r.nor, r.crow, r.statements, r.outstanding]),
+      ["Cadet ID", "Batch", "Name", "Byte", "Status", "NORs", "CROWs", "IPS", "Statements", "Outstanding statements"],
+      rows.map((r) => [r.id, batch.name, r.name, r.byteName ?? "", r.status, r.nor, r.crow, r.ips, r.statements, r.outstanding]),
     );
   }
 

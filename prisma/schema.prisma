@@ -47,6 +47,8 @@ model User {
   occurrencesCreated Occurrence[]
   bulkOperations     BulkOperation[]
   auditEvents        AuditEvent[]
+  synonymGroups      SynonymGroup[]
+  repeatDismissals   RepeatDismissal[]  @relation("RepeatDismissedBy")
 }
 
 model Session {
@@ -93,12 +95,50 @@ model AppConfig {
   flagRecordThreshold    Int      @default(3)
   /// Flag a cadet for review at this many statements requested in a batch.
   flagStatementThreshold Int      @default(3)
+  /// Flag a cadet for review at this many separate IPS occurrences in a batch.
+  flagIpsThreshold       Int      @default(3)
+  /// Repeat offences: this many at one level suggests the next level up
+  /// (IPS -> Statement -> NOR -> CROW -> refer beyond CROW).
+  escalationRepeats      Int      @default(2)
+  /// Extra words the repeat-offence matcher ignores (on top of the built-in list).
+  ignoredWords           String[] @default([])
   updatedAt              DateTime @updatedAt
 }
 
 enum RecordType {
   NOR
   CROW
+  /// Informal Punishment System: what the cadet did and the punishment given on the spot.
+  IPS
+}
+
+/// Words the repeat-offence matcher treats as the same, e.g. late = tardy = not punctual.
+model SynonymGroup {
+  id          String   @id @default(cuid())
+  terms       String[]
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+}
+
+/// An instructor said a suggested repeat offence is "not the same offence".
+/// Revoking (undo) keeps the row for the audit trail.
+model RepeatDismissal {
+  id          String    @id @default(cuid())
+  batchId     String
+  batch       Batch     @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  cadetId     String
+  cadet       Cadet     @relation(fields: [cadetId, batchId], references: [id, batchId], onDelete: Restrict)
+  /// The matched word (or "category:<id>") the suggestion was based on.
+  term        String
+  /// Entries ("R:<id>" / "S:<id>") covered by the dismissal. A new matching entry raises it again.
+  entryKeys   String[]
+  createdAt   DateTime  @default(now())
+  createdById String
+  createdBy   User      @relation("RepeatDismissedBy", fields: [createdById], references: [id])
+  revokedAt   DateTime?
+
+  @@index([batchId, cadetId])
 }
 
 model Category {
@@ -145,6 +185,7 @@ model Batch {
   occurrences    Occurrence[]
   bulkOperations BulkOperation[]
   auditEvents    AuditEvent[]
+  dismissals     RepeatDismissal[]
 }
 
 enum ByteStatus {
@@ -193,6 +234,7 @@ model Cadet {
 
   records    Record[]
   statements Statement[]
+  dismissals RepeatDismissal[]
 
   @@unique([id, batchId])
   @@index([batchId, status])
@@ -252,6 +294,8 @@ model Record {
   categoryId      String?
   category        Category?      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   description     String
+  /// IPS only (required there): the punishment given.
+  punishment      String?
   notes           String?
   referenceNo     String?
   occurredOn      DateTime       @db.Date

@@ -26,7 +26,7 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
   if (!ctx) return <NoActiveBatch />;
   const f: StatsFilters = {
     byteId: sp.byte || undefined,
-    type: sp.type === "NOR" || sp.type === "CROW" || sp.type === "STATEMENT" ? sp.type : undefined,
+    type: sp.type === "NOR" || sp.type === "CROW" || sp.type === "IPS" || sp.type === "STATEMENT" ? sp.type : undefined,
     categoryId: sp.category || undefined,
     status: isStatementStatus(sp.status) ? sp.status : undefined,
     from: sp.from && DATE_RE.test(sp.from) ? sp.from : undefined,
@@ -74,6 +74,7 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
             <option value="">All types</option>
             <option value="NOR">NOR</option>
             <option value="CROW">CROW</option>
+            <option value="IPS">IPS</option>
             <option value="STATEMENT">Statements</option>
           </select>
         </FilterField>

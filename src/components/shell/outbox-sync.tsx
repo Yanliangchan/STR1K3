@@ -84,7 +84,7 @@ export function OutboxSync() {
         <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
-            You&apos;re offline. New NOR, CROW and statement records are saved on this device and sent automatically when you reconnect.
+            You&apos;re offline. New NOR, CROW, IPS and statement records are saved on this device and sent automatically when you reconnect.
           </span>
         </div>
       )}

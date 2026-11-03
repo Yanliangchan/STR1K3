@@ -9,7 +9,7 @@ export type RecurringFlag = {
   cadetId: string;
   cadetName: string;
   byteName: string | null;
-  recordType: "NOR" | "CROW";
+  recordType: "NOR" | "CROW" | "IPS";
   categoryId: string;
   category: string;
   /** Distinct occurrences, counting unlinked records on the same date once. */
@@ -28,6 +28,7 @@ export async function getRecurringConfig() {
     windowDays: cfg?.recurringWindowDays ?? null,
     flagRecordThreshold: cfg?.flagRecordThreshold ?? 3,
     flagStatementThreshold: cfg?.flagStatementThreshold ?? 3,
+    flagIpsThreshold: cfg?.flagIpsThreshold ?? 3,
   };
 }
 
@@ -45,6 +46,7 @@ export async function recurringFlags(batchId: string, opts?: { cadetId?: string 
       batchId,
       status: "ACTIVE",
       categoryId: { not: null },
+      type: { in: ["NOR", "CROW"] },
       ...(opts?.cadetId ? { cadetId: opts.cadetId } : {}),
       ...(since ? { occurredOn: { gte: since } } : {}),
     },
@@ -93,7 +95,7 @@ export async function recurringFlags(batchId: string, opts?: { cadetId?: string 
 
 export async function updateRecurringConfig(
   actor: { id: string },
-  input: { threshold: number; windowDays: number | null; flagRecordThreshold?: number; flagStatementThreshold?: number },
+  input: { threshold: number; windowDays: number | null; flagRecordThreshold?: number; flagStatementThreshold?: number; flagIpsThreshold?: number },
 ) {
   const data = parse(
     z.object({
@@ -101,6 +103,7 @@ export async function updateRecurringConfig(
       windowDays: z.coerce.number().int().min(1).max(3650).nullable(),
       flagRecordThreshold: z.coerce.number().int().min(1, "Minimum is 1.").max(100).optional(),
       flagStatementThreshold: z.coerce.number().int().min(1, "Minimum is 1.").max(100).optional(),
+      flagIpsThreshold: z.coerce.number().int().min(1, "Minimum is 1.").max(100).optional(),
     }),
     input,
   );
@@ -113,6 +116,7 @@ export async function updateRecurringConfig(
         recurringWindowDays: data.windowDays,
         ...(data.flagRecordThreshold ? { flagRecordThreshold: data.flagRecordThreshold } : {}),
         ...(data.flagStatementThreshold ? { flagStatementThreshold: data.flagStatementThreshold } : {}),
+        ...(data.flagIpsThreshold ? { flagIpsThreshold: data.flagIpsThreshold } : {}),
       },
       create: { id: 1, recurringThreshold: data.threshold, recurringWindowDays: data.windowDays },
     });
@@ -126,6 +130,7 @@ export async function updateRecurringConfig(
         windowDays: { from: before.windowDays, to: data.windowDays },
         flagRecordThreshold: { from: before.flagRecordThreshold, to: data.flagRecordThreshold ?? before.flagRecordThreshold },
         flagStatementThreshold: { from: before.flagStatementThreshold, to: data.flagStatementThreshold ?? before.flagStatementThreshold },
+        flagIpsThreshold: { from: before.flagIpsThreshold, to: data.flagIpsThreshold ?? before.flagIpsThreshold },
       },
     });
   });

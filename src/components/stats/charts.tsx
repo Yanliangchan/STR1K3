@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -19,8 +19,24 @@ import {
 import { Card } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
 
-// Validated categorical slots (CVD-safe adjacent pairs); single-series charts use navy.
-const SERIES = { nor: "#2a78d6", crow: "#eb6834", statements: "#1baf7a" };
+// Validated categorical slots 1-4 (CVD-safe adjacent pairs), stepped separately for
+// the dark surface; single-series charts use a neutral.
+const SERIES_LIGHT = { nor: "#2a78d6", crow: "#eb6834", statements: "#1baf7a", ips: "#eda100" };
+const SERIES_DARK = { nor: "#3987e5", crow: "#d95926", statements: "#199e70", ips: "#c98500" };
+
+/** Series colours for the current theme (the `dark` class on <html>). */
+function useSeries() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement;
+    const read = () => setDark(el.classList.contains("dark"));
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return dark ? SERIES_DARK : SERIES_LIGHT;
+}
 const SINGLE = "#3f3f46";
 const AXIS = { fontSize: 12, fill: "currentColor" };
 const GRID = "currentColor";
@@ -115,9 +131,10 @@ function SimpleBars({
   );
 }
 
-export function DistributionChart({ data, b }: { data: { nor: number; crow: number; statements: number }; b?: string | null }) {
+export function DistributionChart({ data, b }: { data: { nor: number; crow: number; ips: number; statements: number }; b?: string | null }) {
   const router = useRouter();
   const rows = [
+    { label: "IPS", value: data.ips, href: "/records?type=IPS" },
     { label: "NOR", value: data.nor, href: "/records?type=NOR" },
     { label: "CROW", value: data.crow, href: "/records?type=CROW" },
     { label: "Statement requests", value: data.statements, href: "/statements?status=ALL" },
@@ -125,7 +142,7 @@ export function DistributionChart({ data, b }: { data: { nor: number; crow: numb
   return (
     <ChartCard
       title="Record distribution"
-      summary={`${data.nor} NORs and ${data.crow} CROWs recorded. ${data.statements} statement requests are tracked separately — a request is not a disciplinary record.`}
+      summary={`${data.nor} NORs, ${data.crow} CROWs and ${data.ips} IPS recorded. ${data.statements} statement requests are tracked separately — a request is not a disciplinary record.`}
       table={{ head: ["Type", "Count"], rows: rows.map((r) => [r.label, r.value]) }}
     >
       <SimpleBars data={rows} onSelect={(h) => router.push(withB(h, b))} />
@@ -147,25 +164,27 @@ export function StatusChart({ data, b }: { data: { label: string; value: number;
   );
 }
 
-export function ByteChart({ data, b }: { data: { byteId: string | null; byte: string; nor: number; crow: number }[]; b?: string | null }) {
+export function ByteChart({ data, b }: { data: { byteId: string | null; byte: string; nor: number; crow: number; ips: number }[]; b?: string | null }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"both" | "nor" | "crow">("both");
-  const series = mode === "both" ? (["nor", "crow"] as const) : ([mode] as const);
+  const SERIES = useSeries();
+  const [mode, setMode] = useState<"all" | "nor" | "crow" | "ips">("all");
+  // Ladder order (IPS, NOR, CROW) also keeps the orange/yellow pair apart.
+  const series = mode === "all" ? (["ips", "nor", "crow"] as const) : ([mode] as const);
   return (
     <ChartCard
       title="Records by byte"
-      summary={data.length ? data.map((d) => `${d.byte}: ${d.nor} NOR, ${d.crow} CROW`).join(" · ") : "No bytes in this batch."}
-      table={{ head: ["Byte", "NOR", "CROW"], rows: data.map((d) => [d.byte, d.nor, d.crow]) }}
+      summary={data.length ? data.map((d) => `${d.byte}: ${d.nor} NOR, ${d.crow} CROW, ${d.ips} IPS`).join(" · ") : "No bytes in this batch."}
+      table={{ head: ["Byte", "NOR", "CROW", "IPS"], rows: data.map((d) => [d.byte, d.nor, d.crow, d.ips]) }}
       actions={
         <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium" role="group" aria-label="Record type">
-          {(["both", "nor", "crow"] as const).map((m) => (
+          {(["all", "ips", "nor", "crow"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
               aria-pressed={mode === m}
               className={cn("min-h-9 rounded-md px-3", mode === m ? "bg-surface text-slate-900 shadow-sm" : "text-slate-600")}
             >
-              {m === "both" ? "Both" : m.toUpperCase()}
+              {m === "all" ? "All" : m.toUpperCase()}
             </button>
           ))}
         </div>
@@ -206,7 +225,7 @@ export function CategoryChart({ data, b }: { data: { type: string; category: str
   return (
     <ChartCard
       title="Record categories"
-      summary={data.length ? `Most frequent: ${rows.slice(0, 3).map((r) => `${r.label} (${r.value})`).join(", ")}.` : "No NOR or CROW records in this view."}
+      summary={data.length ? `Most frequent: ${rows.slice(0, 3).map((r) => `${r.label} (${r.value})`).join(", ")}.` : "No categorised records in this view."}
       table={{ head: ["Category", "Records"], rows: data.map((d) => [`${d.type} · ${d.category}`, d.count]) }}
     >
       <SimpleBars data={rows} onSelect={(h) => router.push(withB(h, b))} />
@@ -218,15 +237,19 @@ export function ActivityChart({
   data,
   granularity,
 }: {
-  data: { date: string; nor: number; crow: number; statements: number }[];
+  data: { date: string; nor: number; crow: number; ips: number; statements: number }[];
   granularity: "day" | "week";
 }) {
-  const totals = data.reduce((a, d) => ({ nor: a.nor + d.nor, crow: a.crow + d.crow, statements: a.statements + d.statements }), { nor: 0, crow: 0, statements: 0 });
+  const SERIES = useSeries();
+  const totals = data.reduce(
+    (a, d) => ({ nor: a.nor + d.nor, crow: a.crow + d.crow, ips: a.ips + d.ips, statements: a.statements + d.statements }),
+    { nor: 0, crow: 0, ips: 0, statements: 0 },
+  );
   return (
     <ChartCard
       title="Record activity over time"
-      summary={`Per ${granularity}, by date of occurrence / request. Totals in range: ${totals.nor} NOR, ${totals.crow} CROW, ${totals.statements} statement requests.`}
-      table={{ head: [granularity === "week" ? "Week starting" : "Date", "NOR", "CROW", "Statements"], rows: data.map((d) => [d.date, d.nor, d.crow, d.statements]) }}
+      summary={`Per ${granularity}, by date of occurrence / request. Totals in range: ${totals.nor} NOR, ${totals.crow} CROW, ${totals.ips} IPS, ${totals.statements} statement requests.`}
+      table={{ head: [granularity === "week" ? "Week starting" : "Date", "NOR", "CROW", "IPS", "Statements"], rows: data.map((d) => [d.date, d.nor, d.crow, d.ips, d.statements]) }}
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ left: -16, right: 8, top: 8, bottom: 4 }}>
@@ -235,6 +258,7 @@ export function ActivityChart({
           <YAxis allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={tooltipStyle.contentStyle} cursor={{ stroke: "currentColor", strokeOpacity: 0.4 }} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Line isAnimationActive={false} type="linear" dataKey="ips" name="IPS" stroke={SERIES.ips} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line isAnimationActive={false} type="linear" dataKey="nor" name="NOR" stroke={SERIES.nor} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line isAnimationActive={false} type="linear" dataKey="crow" name="CROW" stroke={SERIES.crow} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
           <Line isAnimationActive={false} type="linear" dataKey="statements" name="Statements" stroke={SERIES.statements} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />

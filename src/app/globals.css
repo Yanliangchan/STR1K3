@@ -40,6 +40,7 @@
   --color-danger: #b91c1c;
   --color-danger-hover: #991b1b;
   --color-crow: #9f1239;
+  --color-ips: #3f5a7a;
 }
 
 /*
@@ -58,6 +59,7 @@
   --color-danger: #b42323;
   --color-danger-hover: #c53030;
   --color-crow: #b4304f;
+  --color-ips: #4f6f94;
 
   --color-slate-50: #0b0b0c;
   --color-slate-100: #1f1f23;

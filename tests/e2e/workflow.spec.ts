@@ -182,7 +182,11 @@ test("home leads with outstanding statements and flagged cadets, with explanatio
   const sections = await page.locator("main h2").allInnerTexts();
   const idx = (t: string) => sections.findIndex((s) => s.toUpperCase().startsWith(t));
   expect(idx("OUTSTANDING STATEMENTS")).toBeGreaterThanOrEqual(0);
-  expect(idx("OUTSTANDING STATEMENTS")).toBeLessThan(idx("CADETS FLAGGED"));
+  expect(idx("OUTSTANDING STATEMENTS")).toBeLessThan(idx("REPEAT OFFENCES"));
+  expect(idx("REPEAT OFFENCES")).toBeLessThan(idx("CADETS FLAGGED"));
+  // Only the 3 most urgent cadets, then a "+ N more" link.
+  await expect(page.getByTestId("outstanding-list").locator(":scope > li")).toHaveCount(3);
+  await expect(page.getByText(/\+ \d+ more cadets? with outstanding statements/)).toBeVisible();
   expect(idx("CADETS FLAGGED")).toBeLessThan(idx("WHAT THE DATA SAYS"));
   await expect(page.getByTestId("outstanding-list").locator("li").first()).toContainText(/Overdue/);
   await expect(page.getByTestId("flagged-list")).toContainText(/separate occurrences|statements requested|repeated/);
@@ -255,9 +259,11 @@ test("statements can be actioned straight from Home and the cadet profile", asyn
   const list = page.getByTestId("outstanding-list");
   const accept = list.getByTestId("quick-accept").first();
   await expect(accept).toBeVisible();
-  const pendingBefore = await list.getByTestId("quick-accept").count();
+  // Home shows only the top cadets, so check the batch-wide count in the summary line.
+  const waiting = async () => Number((await page.getByTestId("today-summary").innerText()).match(/(\d+) waiting for your review/)?.[1] ?? 0);
+  const pendingBefore = await waiting();
   await accept.click();
-  await expect(list.getByTestId("quick-accept")).toHaveCount(pendingBefore - 1);
+  await expect.poll(waiting).toBe(pendingBefore - 1);
 
   // Cadet profile shows open statements with their next action.
   await list.locator("a[href^='/cadets/']").first().click();
@@ -334,4 +340,47 @@ test("app is installable: manifest, icons, service worker and offline page are s
   for (const icon of manifest.icons) expect((await request.get(icon.src)).status()).toBe(200);
   expect((await request.get("/sw.js")).status()).toBe(200);
   expect(await (await request.get("/offline.html")).text()).toContain("You're offline");
+});
+
+test("IPS: record what they did and the punishment, then see the repeat offence and the suggested next step", async ({ page }) => {
+  await signIn(page);
+  // Home shows the top few; the full list is on /repeats.
+  await page.goto("/repeats");
+  const rowan = page.getByTestId("repeat-group").filter({ hasText: "Rowan Teo" });
+  await expect(rowan).toContainText("Same offence ×2");
+  await expect(rowan.getByTestId("repeat-suggestion")).toContainText("Next: Statement");
+
+  // Give another IPS from the cadet profile.
+  await rowan.getByRole("link", { name: "Rowan Teo" }).click();
+  await expect(page.getByTestId("cadet-name")).toHaveText("Rowan Teo");
+  await page.locator("a[href^='/records/new?type=IPS']").click();
+  await expect(page).toHaveURL(/type=IPS/);
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("What they did").fill("Eating chips in the lab");
+  await page.getByTestId("review-entries").click();
+  await expect(page.getByText("Enter the punishment given.").first()).toBeVisible();
+  await page.getByTestId("punishment-picks").getByRole("button", { name: "20 push-ups" }).click();
+  await expect(page.getByTestId("ips-punishment")).toHaveValue("20 push-ups");
+  await page.getByTestId("review-entries").click();
+  await expect(page.getByTestId("entry-success")).toContainText("1 IPS created");
+
+  await page.goto("/repeats");
+  await expect(page.getByTestId("repeat-group").filter({ hasText: "Rowan Teo" })).toContainText("Same offence ×3");
+
+  // The suggested next step opens a prefilled statement request.
+  await page.getByTestId("repeat-group").filter({ hasText: "Rowan Teo" }).getByTestId("repeat-create").click();
+  await expect(page).toHaveURL(/type=STATEMENT/);
+  await expect(page.getByTestId("selected-cadets")).toContainText("Rowan Teo");
+  await expect(page.getByLabel("Subject")).toHaveValue("Eating chips in the lab");
+});
+
+test("a wrong repeat-offence match can be dismissed and undone", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/repeats");
+  const riley = page.getByTestId("repeat-group").filter({ hasText: "Riley Wong" });
+  await expect(riley).toBeVisible();
+  await riley.getByTestId("repeat-not-same").click();
+  await expect(riley).toHaveCount(0);
+  await page.getByTestId("toast-undo").click();
+  await expect(page.getByTestId("repeat-group").filter({ hasText: "Riley Wong" })).toBeVisible();
 });

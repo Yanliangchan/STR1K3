@@ -19,6 +19,7 @@ import {
   Upload,
   User,
   Users,
+  Repeat,
   X,
 } from "lucide-react";
 import { quickSearchAction } from "@/app/actions/data";
@@ -30,6 +31,7 @@ type Item = { key: string; href: string; label: string; hint?: string; Icon: typ
 const ACTIONS: Item[] = [
   { key: "a-nor", href: "/records/new?type=NOR", label: "New NOR", Icon: Plus, keywords: "record nor negative observation add create" },
   { key: "a-crow", href: "/records/new?type=CROW", label: "New CROW", Icon: Plus, keywords: "record crow add create" },
+  { key: "a-ips", href: "/records/new?type=IPS", label: "New IPS", Icon: Plus, keywords: "ips informal punishment system add create" },
   { key: "a-stmt", href: "/records/new?type=STATEMENT", label: "Request statements", Icon: FileText, keywords: "statement request new ask" },
   { key: "a-review", href: "/statements?status=PENDING_REVIEW", label: "Review handed-in statements", Icon: ClipboardList, keywords: "review accept pending statements" },
   { key: "a-overdue", href: "/statements?status=OVERDUE", label: "Overdue statements", Icon: AlarmClock, keywords: "overdue late chase deadline statements" },
@@ -37,8 +39,9 @@ const ACTIONS: Item[] = [
 const PAGES: Item[] = [
   { key: "p-home", href: "/", label: "Home", Icon: Home, keywords: "dashboard home overview" },
   { key: "p-cadets", href: "/cadets", label: "Cadets (roster)", Icon: Users, keywords: "cadets roster list people" },
-  { key: "p-records", href: "/records", label: "All records", Icon: ClipboardList, keywords: "records nor crow list history" },
+  { key: "p-records", href: "/records", label: "All records", Icon: ClipboardList, keywords: "records nor crow ips list history" },
   { key: "p-statements", href: "/statements", label: "Statement queue", Icon: FileText, keywords: "statements queue outstanding" },
+  { key: "p-repeats", href: "/repeats", label: "Repeat offences", Icon: Repeat, keywords: "repeat repeated offences again twice escalate ladder" },
   { key: "p-stats", href: "/stats", label: "Statistics", Icon: BarChart3, keywords: "statistics stats charts graphs trends recurring" },
   { key: "p-batches", href: "/batches", label: "Batch management", Icon: FolderCog, keywords: "batch batches bytes archive activate roster manage add cadet" },
   { key: "p-activity", href: "/activity", label: "Activity history", Icon: Activity, keywords: "activity audit history log changes" },
@@ -212,7 +215,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                       </button>
                       {c.status === "ACTIVE" && (
                         <span className="flex shrink-0 gap-1">
-                          {(["NOR", "CROW", "STATEMENT"] as const).map((t) => (
+                          {(["NOR", "CROW", "IPS", "STATEMENT"] as const).map((t) => (
                             <button
                               key={t}
                               type="button"

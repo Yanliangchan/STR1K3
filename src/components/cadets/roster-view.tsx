@@ -15,6 +15,7 @@ const FILTERS = [
   { value: "", label: "All cadets" },
   { value: "nor", label: "With NORs" },
   { value: "crow", label: "With CROWs" },
+  { value: "ips", label: "With IPS" },
   { value: "outstanding", label: "Outstanding statements" },
   { value: "rewrite", label: "Rewrite required" },
   { value: "none", label: "No records" },
@@ -192,6 +193,7 @@ export function RosterView({
                   <th className="px-3 py-2">Byte</th>
                   <th className="px-3 py-2 text-right">NORs</th>
                   <th className="px-3 py-2 text-right">CROWs</th>
+                  <th className="px-3 py-2 text-right">IPS</th>
                   <th className="px-3 py-2 text-right">Statements</th>
                   <th className="px-3 py-2 text-right">Outstanding</th>
                 </tr>
@@ -213,6 +215,7 @@ export function RosterView({
                     <td className="px-3 py-2 text-slate-600">{r.byteName ?? "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{r.nor}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{r.crow}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{r.ips}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{r.statements}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {r.outstanding > 0 ? <Badge tone={r.rewrite > 0 ? "amber" : "navy"}>{r.outstanding}</Badge> : <span className="text-slate-400">0</span>}
@@ -236,7 +239,7 @@ export function RosterView({
               <X className="h-4 w-4" aria-hidden /> Clear
             </Button>
             <span className="flex gap-1.5" role="group" aria-label="Create for selected cadets">
-              {(["NOR", "CROW", "STATEMENT"] as const).map((t) => (
+              {(["NOR", "CROW", "IPS", "STATEMENT"] as const).map((t) => (
                 <Link
                   key={t}
                   href={createHref(t)}
@@ -259,6 +262,7 @@ function CountsLine({ r }: { r: RosterRow }) {
     <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600">
       <span>NOR {r.nor}</span>
       <span>CROW {r.crow}</span>
+      {r.ips > 0 && <span>IPS {r.ips}</span>}
       <span>Stmt {r.statements}</span>
       {r.outstanding > 0 && <span className={cn("font-medium", r.rewrite ? "text-amber-800" : "text-navy-700")}>{r.outstanding} outstanding</span>}
     </p>

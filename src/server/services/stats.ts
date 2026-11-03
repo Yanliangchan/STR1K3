@@ -18,6 +18,7 @@ export async function dashboardCounts(batchId: string) {
     cadets,
     nor: byType.NOR ?? 0,
     crow: byType.CROW ?? 0,
+    ips: byType.IPS ?? 0,
     statements: totalStatements,
     notSubmitted: byStatus.NOT_SUBMITTED ?? 0,
     pendingReview: byStatus.PENDING_REVIEW ?? 0,
@@ -30,7 +31,7 @@ export async function dashboardCounts(batchId: string) {
 
 export type StatsFilters = {
   byteId?: string;
-  type?: "NOR" | "CROW" | "STATEMENT";
+  type?: RecordType | "STATEMENT";
   categoryId?: string;
   status?: StatementStatus;
   from?: string;
@@ -53,7 +54,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
   const recordWhere: Prisma.RecordWhereInput = {
     batchId,
     status: "ACTIVE",
-    ...(f.type === "NOR" || f.type === "CROW" ? { type: f.type } : {}),
+    ...(f.type && f.type !== "STATEMENT" ? { type: f.type } : {}),
     ...(f.byteId ? { cadet: { byteId: f.byteId === "none" ? null : f.byteId } } : {}),
     ...(f.categoryId ? { categoryId: f.categoryId } : {}),
     ...dateRange("occurredOn", f),
@@ -86,6 +87,7 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
   const distribution = {
     nor: records.filter((r) => r.type === "NOR").length,
     crow: records.filter((r) => r.type === "CROW").length,
+    ips: records.filter((r) => r.type === "IPS").length,
     statements: statements.length,
   };
 
@@ -101,9 +103,10 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
       byte: b.name,
       nor: records.filter((r) => r.type === "NOR" && r.cadet.byteId === b.id).length,
       crow: records.filter((r) => r.type === "CROW" && r.cadet.byteId === b.id).length,
+      ips: records.filter((r) => r.type === "IPS" && r.cadet.byteId === b.id).length,
       statements: statements.filter((s) => s.cadet.byteId === b.id).length,
     }))
-    .filter((r) => r.byteId !== null || r.nor + r.crow + r.statements > 0);
+    .filter((r) => r.byteId !== null || r.nor + r.crow + r.ips + r.statements > 0);
 
   const catName = new Map(categories.map((c) => [c.id, c.name]));
   const catCounts = new Map<string, { type: RecordType; categoryId: string | null; category: string; count: number }>();
@@ -130,14 +133,14 @@ export async function statistics(batchId: string, f: StatsFilters = {}) {
   const days = enumerateDays(start, end);
   const weekly = days.length > 62;
   const bucketOf = (iso: string) => (weekly ? weekStart(iso) : iso);
-  const buckets = new Map<string, { date: string; nor: number; crow: number; statements: number }>();
+  const buckets = new Map<string, { date: string; nor: number; crow: number; ips: number; statements: number }>();
   for (const d of days) {
     const b = bucketOf(d);
-    if (!buckets.has(b)) buckets.set(b, { date: b, nor: 0, crow: 0, statements: 0 });
+    if (!buckets.has(b)) buckets.set(b, { date: b, nor: 0, crow: 0, ips: 0, statements: 0 });
   }
   for (const r of records) {
     const b = buckets.get(bucketOf(dateOnlyISO(r.occurredOn)));
-    if (b) b[r.type === "NOR" ? "nor" : "crow"]++;
+    if (b) b[r.type === "NOR" ? "nor" : r.type === "CROW" ? "crow" : "ips"]++;
   }
   for (const s of statements) {
     const b = buckets.get(bucketOf(dateOnlyISO(s.issuedOn)));

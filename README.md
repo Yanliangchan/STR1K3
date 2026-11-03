@@ -14,8 +14,10 @@ Cadets have no accounts. Everything is entered by instructors.
 
 | Area | What it does |
 |---|---|
-| **Find anything, fast** | One search (header icon, the bar on Home, or `/` / Ctrl+K on desktop) finds cadets, statements, records **and pages**. Each cadet result has **NOR / CROW / Stmt** buttons to start a record for them straight away; typing "stats" or "export" jumps to that page. Recently viewed cadets show when the box is empty. Press `n` anywhere for a new record. |
-| **Fewer taps** | <ul><li>Statement actions (**Handed in / Accept / Rewrite**) appear wherever a statement is listed: Home, the cadet profile and the queue.</li><li>Roster selection offers **+ NOR / + CROW / Statement** directly.</li><li>A single-cadet record is created in one tap. The confirm step is kept for bulk.</li><li>**Recently used descriptions** are one-tap chips that also fill the category, and the last category used for each type is remembered.</li><li>After saving NORs/CROWs: **Request statements from these cadets** (subject and occurrence carried over) or **Another record for the same cadets**.</li></ul> |
+| **IPS** | *Informal Punishment System*: nothing is handed in. Record **what the cadet did** and **the punishment given** (required). Punishments you've used before appear as one-tap chips. IPS works everywhere NOR/CROW do (bulk entry, roster buttons, search, categories, corrections, CSV export, statistics) and is counted separately, with its own review-flag threshold. |
+| **Repeat offences** | Home lists cadets who did **the same thing more than once** (e.g. late twice, eating in the lab twice) and suggests the next step on the ladder **IPS → Statement → NOR → CROW → beyond CROW**. Two at one level (configurable) suggests the next level. Mixed levels suggest staying at the highest level until it repeats. Each suggestion has a one-tap button that opens the suggested record, prefilled for that cadet. Suggestions only: nothing is created automatically. See *How repeat matching works* below. |
+| **Find anything, fast** | One search (header icon, the bar on Home, or `/` / Ctrl+K on desktop) finds cadets, statements, records **and pages**. Each cadet result has **NOR / CROW / IPS / Stmt** buttons to start a record for them straight away; typing "stats" or "export" jumps to that page. Recently viewed cadets show when the box is empty. Press `n` anywhere for a new record. |
+| **Fewer taps** | <ul><li>Statement actions (**Handed in / Accept / Rewrite**) appear wherever a statement is listed: Home, the cadet profile and the queue.</li><li>Roster selection offers **+ NOR / + CROW / + IPS / Statement** directly.</li><li>A single-cadet record is created in one tap. The confirm step is kept for bulk.</li><li>**Recently used descriptions** are one-tap chips that also fill the category, and the last category used for each type is remembered.</li><li>After saving NORs/CROWs: **Request statements from these cadets** (subject and occurrence carried over) or **Another record for the same cadets**.</li></ul> |
 | **Undo** | After a quick **Handed in / Accept / Rewrite** (button or swipe), the toast offers **Undo** for 10 seconds. Nothing is deleted: the hand-in or review is marked *undone* and stays visible in the history, the previous status and deadline are restored, and the undo is audited. Only the instructor who made the change can undo it, within 2 minutes, and only if nothing has changed since. |
 | **Swipe** | In the statement queue, swipe a row right to mark it handed in or to accept it. Buttons remain for everyone else. |
 | **Install & offline** | Installable to the home screen (Android: *Install* in **More**; iPhone: Share → *Add to Home Screen*), with app shortcuts. If the connection drops while saving a NOR/CROW/statement request, it is kept in an on-device outbox and **sent automatically when you're back online**; the idempotency key means it can never be saved twice. A banner shows what is waiting to send. For security, the service worker caches only app files and a generic offline page, **never cadet pages or data**. |
@@ -32,9 +34,9 @@ Cadets have no accounts. Everything is entered by instructors.
 | **Shared occurrence** | Optional link between records that came from one event. Linked records count as one occurrence when detecting recurring issues. Never mandatory. |
 | **Statements (tracking only)** | STR1K3 does **not** store what a cadet wrote. Each statement has a subject, optional notes, an **issue date** and a required **deadline** (date and time, default 23:59, with one-tap presets). Statuses: Not submitted → Pending review → Accepted / Rewrite required → (rewrite handed in) → Pending review. **Rewrite required always sets a new deadline**; feedback is optional. Every hand-in is logged with its time and marked **On time** or **Late** against the deadline that applied. Statements past their deadline are marked **Overdue**. Extensions go through *Edit / extend deadline*, with a reason. The queue has one-tap **Handed in / Accept / Rewrite** buttons on each row, plus confirmed bulk versions of the same actions. Reopening an accepted statement requires a reason. |
 | **Corrections** | NORs, CROWs and statement requests can be corrected with a mandatory reason; the before/after values are kept in the audit trail. Records can be **voided** (kept, but excluded from counts). There is no hard delete anywhere in the UI, and the database blocks deletes. |
-| **Dashboard** | Built around what needs doing, in this order:<br>1. A one-line summary (e.g. "2 overdue · 1 due within 24 h · 2 waiting for your review").<br>2. **Outstanding statements, grouped by cadet**: overdue first, then due soon, then waiting on you.<br>3. **Cadets flagged for review**: N+ separate NOR/CROW occurrences, N+ statements, or the same category repeating, each with a plain-language reason. Thresholds are configurable and flags are ordered by recent activity, not by count.<br>4. **What the data says**: findings that each state *why it matters*, such as overdue rate, review backlog age, late hand-in rate, rewrite rate, week-on-week trend, a dominant category, or a byte with a higher rate per cadet. A finding is only shown when there is enough data for it to mean something.<br>5. Batch totals and latest changes. |
-| **Statistics** | Record distribution, statement status, records by byte (NOR/CROW toggle), categories, activity over time, and outstanding statements over time (rebuilt from the audit trail). Filters: batch, byte, type, category, status and date range. Every chart has a data-table view and links through to the filtered list. |
-| **Recurring issues** | Flags a cadet with ≥ N distinct occurrences in the same NOR/CROW category (default 3; configurable, optionally within a day window). Shared occurrences count once. Unlinked records on the same date are flagged for **manual review** rather than counted as separate occurrences. Statements never count. Flags never create records or trigger action. |
+| **Dashboard** | Built around what needs doing, in this order:<br>1. A one-line summary (e.g. "2 overdue · 1 due within 24 h · 2 waiting for your review").<br>2. **Outstanding statements, grouped by cadet**: the 3 most urgent (overdue first, then due soon, then waiting on you), then "+ N more cadets with outstanding statements".<br>3. **Repeat offences** with the suggested next step (top 4; the rest on **/repeats**).<br>4. **Cadets flagged for review**: N+ separate NOR/CROW occurrences, N+ IPS, or N+ statements, each with a plain-language reason. Thresholds are configurable and flags are ordered by recent activity, not by count.<br>5. **What the data says**: findings that each state *why it matters*, such as overdue rate, review backlog age, late hand-in rate, rewrite rate, week-on-week trend, a dominant category, or a byte with a higher rate per cadet. A finding is only shown when there is enough data for it to mean something.<br>6. Batch totals and latest changes. |
+| **Statistics** | Record distribution, statement status, records by byte (IPS/NOR/CROW toggle), categories, activity over time, and outstanding statements over time (rebuilt from the audit trail). Filters: batch, byte, type, category, status and date range. Every chart has a data-table view and links through to the filtered list. |
+| **Recurring categories** (Statistics) | Flags a cadet with ≥ N distinct occurrences in the same NOR/CROW category (default 3; configurable, optionally within a day window). Shared occurrences count once. Unlinked records on the same date are flagged for **manual review** rather than counted as separate occurrences. Statements never count. Flags never create records or trigger action. |
 | **Audit** | Append-only audit table: a database trigger rejects UPDATE and DELETE. It records the actor, time, entity, batch, cadet, a summary, a before/after diff and a reason. Browse it on the **Activity history** page. |
 | **Import / export** | CSV roster import with preview, row-level errors, duplicate-name warnings, invalid-byte detection and explicit confirmation. Existing cadets are never overwritten. CSV export of records, statements or roster with filters. Exports are formula-injection-safe, POST + same-origin only, and audited. Statement content is included only when explicitly ticked. |
 
@@ -119,7 +121,7 @@ npm run build && E2E_DATABASE_URL=postgresql://user:pass@localhost:5432/str1k3_e
 
 Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a different Chromium binary.
 
-**Integration tests (53)** cover:
+**Integration tests (72)** cover:
 - passwords, sign-in, rate limiting, session renewal, idle and absolute expiry, logout and revocation, deactivation, and admin-only account management
 - single active batch, explicit switching, new batches starting empty, and historical isolation
 - rejection of cross-batch writes at both the service and database level
@@ -131,14 +133,18 @@ Playwright uses its own Chromium. Set `PLAYWRIGHT_CHROMIUM_PATH` to use a differ
 - undo of hand-ins, accepts and rewrites (restoring the deadline), ownership, the 2-minute window, and that nothing is deleted
 - dashboard ordering (overdue first), flagged-cadet thresholds and reasons (shared occurrences count once), and insights shown only with enough data
 - dashboard counts against the database, statistics filters, and recurring flags without double counting
+- IPS: punishment required (service and database), corrections audited, separate flag threshold
+- keyword matching (filler words, word forms, numbers, synonyms and phrases, ignored words, typo folding, over-common words) and repeat offences: the full ladder, mixed levels, shared occurrences counted once, categories, configurable ladder size, and "not the same offence" with undo
 - append-only audit, no hard deletes, CSV formula injection, export scoping, and CSV import validation
 
-**End-to-end tests (13, mobile viewport)** cover:
+**End-to-end tests (16, mobile viewport)** cover:
 - the full Definition of Done workflow: sign in, land on the active batch, search and multi-select cadets, bulk-create statements, take three statements down independent paths (pending review, rewrite, accepted), check dashboard counts, cadet history and statistics, sign out and back in, switch the active batch and back, and check the activity history
 - bulk NOR creation using the type-ahead picker, with a correction that keeps the previous value
 - the search palette (name → NOR for that cadet → one-tap create → follow-up statement request, and jumping to pages by name), statement actions from Home and the cadet profile,
 - The Statements tab action badge, undo from the toast, swipe-to-act, offline save then automatic send on reconnect, dark mode persistence, and the install assets (manifest, icons, service worker, offline page),
 - the dashboard section order and explanations, the Overdue tab with one-tap "Handed in", and the roster search surviving Back from a cadet profile
+- IPS from the cadet profile (punishment required, one-tap punishment pick), the repeat offence growing, the suggested next step opening a prefilled statement request, and dismiss + undo of a wrong match
+- Home showing only 3 outstanding cadets with "+ N more"
 - unauthenticated API rejection
 
 ---
@@ -178,6 +184,30 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 
 ---
 
+## How repeat matching works
+
+No AI is involved, and every match says *why*: "Same offence ×2 · matched on “late”".
+
+1. **Words, not filler.** Descriptions (IPS/NOR/CROW) and statement subjects are split into words. Filler such as *to, into, and, the, was, for, cadet, instructor, today*, numbers and times (*0600*) are dropped. The punishment text is never used for matching.
+2. **Word forms match.** A light stemmer treats *late / lateness / latecomer*, *eat / eating / ate*, *boot / boots*, *absent / absence* and *punctual / punctuality* as the same word.
+3. **Your synonyms.** In **Settings → Repeat offences**, add groups that mean the same thing, e.g. *late, tardy, not punctual* or *phone, handphone, hp, mobile*. Phrases work.
+4. **Your ignore list.** Add context words that cause false matches in your batch (e.g. *parade, lesson, bunk*).
+5. **Typos.** A one-letter slip on a word of 6+ letters (*unifrom*) is folded into the spelling used more often in the batch.
+6. **Over-common words count for less.** A word used in 30%+ of the batch's entries (once there are 15+) only creates a match together with a second such word.
+7. **Same category** also counts as the same offence.
+8. **One event counts once.** Entries linked to one shared occurrence (e.g. a NOR and a statement for the same incident) are one offence, not a repeat.
+9. **"Not the same offence"** hides a wrong suggestion (with Undo). If another matching entry is recorded later, it comes back.
+
+Settings also has a **Try it** box that shows which words a description would be matched on, before you save. The look-back window ("Only look back (days)") applies here too.
+
+**Ideas to improve matching further (still without AI):**
+- **Offence keyword list per category.** Attach trigger words to each category (*Punctuality: late, tardy, muster*) so free-text entries are auto-tagged, and suggest the category while typing.
+- **Pick-from-list offences.** A short standard offence list (with free text as a fallback) is the most reliable fix, because consistent wording beats clever matching.
+- **Learn from dismissals.** When the same word is dismissed several times across cadets, suggest adding it to the ignore list.
+- **Phrase weighting.** Score matching *pairs* of words (*eating + lab*) above single words, and show the strongest match first.
+- **Time decay.** Weight recent repeats more than ones from weeks ago, or reset the ladder after a clean period.
+- **Sounds-alike matching** (Soundex/Metaphone) for misspellings beyond one letter; best kept to long words to avoid false matches.
+
 ## Limitations / not implemented
 
 - **No self-service password reset by email.** No email service is configured; an administrator resets passwords instead.
@@ -187,7 +217,8 @@ Railway Postgres runs on Railway's infrastructure. Store cadet records only on i
 - **Per-cadet overrides in bulk entry** cover description/subject and notes. Category, dates and the deadline are shared across the selection; each one can be changed individually afterwards (deadline via *Edit / extend deadline*).
 - **Long lists are capped** rather than paginated: the newest 200 records and 300 statements per view, and 50 entries per page in the activity history. Filters narrow the lists.
 - **Notifications** appear in the in-app activity feed only (no push or email).
-- **Offline:** only *creating* NOR/CROW/statement records works offline (queued and sent later). Viewing records and other changes (reviews, corrections) need a connection.
+- **Repeat matching is keyword-based.** It can miss offences described with completely different words (add synonyms) and can link unrelated ones that share a word (add it to the ignore list, or use *Not the same offence*).
+- **Offline:** only *creating* NOR/CROW/IPS/statement records works offline (queued and sent later). Viewing records and other changes (reviews, corrections) need a connection.
 - **"Outstanding over time"** is rebuilt from the audit trail, so data written directly to the database outside the app is not reflected.
 - **A single configured time zone.**
 

@@ -5,7 +5,8 @@ import { prisma } from "@/lib/db";
 import { getAppConfig } from "@/server/services/config";
 import { orNotFound } from "@/server/context";
 import { getCadet, cadetCounts } from "@/server/services/cadets";
-import { recurringFlags } from "@/server/services/recurring";
+import { repeatOffences } from "@/server/services/repeats";
+import { RepeatList } from "@/components/repeats/repeat-list";
 import { Alert, Card, EmptyState, Stat } from "@/components/ui/misc";
 import { Badge, OverdueBadge, StatusBadge } from "@/components/ui/badges";
 import { RememberCadet } from "@/components/cadets/remember-cadet";
@@ -22,6 +23,7 @@ const TABS = [
   { value: "", label: "All" },
   { value: "NOR", label: "NOR" },
   { value: "CROW", label: "CROW" },
+  { value: "IPS", label: "IPS" },
   { value: "STATEMENT", label: "Statements" },
 ];
 
@@ -40,7 +42,7 @@ export default async function CadetPage({
   const readOnly = cadet.batch.status !== "OPEN";
   const ctxParam = isActiveBatch ? "" : `&b=${cadet.batchId}`;
 
-  const [records, statements, countsMap, flags] = await Promise.all([
+  const [records, statements, countsMap, repeats] = await Promise.all([
     prisma.record.findMany({
       where: { cadetId: cadet.id, batchId: cadet.batchId },
       include: { category: true, createdBy: { select: { name: true } } },
@@ -50,12 +52,12 @@ export default async function CadetPage({
       include: { createdBy: { select: { name: true } }, _count: { select: { versions: { where: { retractedAt: null } } } } },
     }),
     cadetCounts(cadet.batchId, [cadet.id]),
-    recurringFlags(cadet.batchId, { cadetId: cadet.id }),
+    repeatOffences(cadet.batchId, { cadetId: cadet.id }),
   ]);
   const openStatements = statements
     .filter((st) => !st.voided && st.status !== "ACCEPTED")
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
-  const counts = countsMap.get(cadet.id) ?? { nor: 0, crow: 0, statements: 0, outstanding: 0, rewrite: 0 };
+  const counts = countsMap.get(cadet.id) ?? { nor: 0, crow: 0, ips: 0, statements: 0, outstanding: 0, rewrite: 0 };
 
   const history: HistoryEntry[] = [
     ...records.map((r) => ({
@@ -64,6 +66,7 @@ export default async function CadetPage({
       date: r.occurredOn,
       category: r.category?.name ?? null,
       description: r.description,
+      punishment: r.punishment,
       status: null,
       voided: r.status === "VOIDED",
       createdBy: r.createdBy.name,
@@ -132,21 +135,25 @@ export default async function CadetPage({
             .
           </p>
         )}
-        <dl className="mt-4 grid grid-cols-4 gap-2 border-t border-slate-100 pt-3" data-testid="cadet-counts">
+        <dl className="mt-4 grid grid-cols-5 gap-2 border-t border-slate-100 pt-3" data-testid="cadet-counts">
           <Stat label="NORs" value={counts.nor} />
           <Stat label="CROWs" value={counts.crow} />
+          <Stat label="IPS" value={counts.ips} />
           <Stat label="Statements" value={counts.statements} />
           <Stat label="Outstanding" value={counts.outstanding} />
         </dl>
       </Card>
 
       {!readOnly && cadet.status === "ACTIVE" && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Link href={newHref("NOR")} className={buttonClasses("secondary", "md", "px-2")}>
             <Plus className="h-4 w-4" aria-hidden /> NOR
           </Link>
           <Link href={newHref("CROW")} className={buttonClasses("secondary", "md", "px-2")}>
             <Plus className="h-4 w-4" aria-hidden /> CROW
+          </Link>
+          <Link href={newHref("IPS")} className={buttonClasses("secondary", "md", "px-2")}>
+            <Plus className="h-4 w-4" aria-hidden /> IPS
           </Link>
           <Link href={newHref("STATEMENT")} className={buttonClasses("secondary", "md", "px-2")}>
             <FileText className="h-4 w-4" aria-hidden /> Statement
@@ -183,12 +190,14 @@ export default async function CadetPage({
         </section>
       )}
 
-      {flags.map((f) => (
-        <Alert key={f.categoryId} tone="warning" title={f.needsManualReview ? "Possible repeated records — manual review needed" : "Repeated records in this category — review recommended"}>
-          {f.recordType} · {f.category}: {f.distinctOccurrences} distinct occurrence{f.distinctOccurrences === 1 ? "" : "s"} across {f.recordCount} record
-          {f.recordCount === 1 ? "" : "s"}. This is a prompt for review only — not a finding.
-        </Alert>
-      ))}
+      {repeats.groups.length > 0 && (
+        <section aria-labelledby="repeats-h">
+          <h2 id="repeats-h" className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Repeat offences ({repeats.groups.length})
+          </h2>
+          <RepeatList groups={repeats.groups} batchId={cadet.batchId} showCadet={false} readOnly={readOnly || cadet.status !== "ACTIVE"} />
+        </section>
+      )}
 
       <section aria-labelledby="history-h">
         <div className="mb-2 flex items-center justify-between">

@@ -5,7 +5,7 @@ import type { Actor } from "@/server/actor";
 import { createBatch, activateBatch } from "@/server/services/batches";
 
 const TABLES = [
-  "AuditEvent", "StatementReview", "StatementVersion", "Statement", "Record", "BulkOperation", "Occurrence",
+  "AuditEvent", "RepeatDismissal", "SynonymGroup", "StatementReview", "StatementVersion", "Statement", "Record", "BulkOperation", "Occurrence",
   "Cadet", "Byte", "Category", "Session", "LoginAttempt", "AppConfig", "Batch", "User",
 ];
 

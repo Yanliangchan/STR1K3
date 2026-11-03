@@ -7,11 +7,13 @@ import { formatDateOnly, formatDateTime, formatDeadline } from "@/lib/dates";
 import { truncate } from "@/lib/utils";
 
 export type HistoryEntry = {
-  kind: "NOR" | "CROW" | "STATEMENT";
+  kind: "NOR" | "CROW" | "IPS" | "STATEMENT";
   id: string;
   date: Date;
   category: string | null;
   description: string;
+  /** IPS only. */
+  punishment?: string | null;
   status: StatementStatus | null;
   /** Statements only: current deadline. */
   dueAt?: Date;
@@ -42,6 +44,7 @@ export function HistoryItem({ e, showCadet = false }: { e: HistoryEntry; showCad
           </p>
         )}
         <p className={e.voided ? "text-sm text-slate-500 line-through" : "text-sm text-slate-700"}>{truncate(e.description, 160)}</p>
+        {e.punishment && <p className="text-sm text-slate-700"><span className="font-medium">Punishment:</span> {truncate(e.punishment, 120)}</p>}
         {e.status && e.dueAt && !e.voided && awaitingCadet(e.status) && (
           <p className="text-xs font-medium text-slate-700">Deadline {formatDeadline(e.dueAt)}</p>
         )}

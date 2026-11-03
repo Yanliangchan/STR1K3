@@ -13,6 +13,8 @@ import { OverdueBadge, StatusBadge } from "@/components/ui/badges";
 import { batchHref, cn, pluralize, truncate } from "@/lib/utils";
 import { dueRelative, formatDeadline, formatRelative, todayISO } from "@/lib/dates";
 import { StatementQuickActions } from "@/components/statements/statement-quick-actions";
+import { repeatOffences } from "@/server/services/repeats";
+import { RepeatList } from "@/components/repeats/repeat-list";
 
 export const metadata = { title: "Home" };
 
@@ -27,8 +29,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   if (!ctx) return <NoActiveBatch />;
   const b = ctx.contextParam;
   const now = new Date();
-  const [outstanding, flagged, findings, counts, activity] = await Promise.all([
+  const [outstanding, repeats, flagged, findings, counts, activity] = await Promise.all([
     outstandingByCadet(ctx.batch.id, now),
+    repeatOffences(ctx.batch.id),
     flaggedCadets(ctx.batch.id),
     insights(ctx.batch.id, now),
     dashboardCounts(ctx.batch.id),
@@ -36,7 +39,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ]);
   const t = outstanding.totals;
   const today = todayISO(now);
-  const SHOWN = 8;
+  const SHOWN = 3;
+  const REPEATS_SHOWN = 4;
 
   const summary =
     t.outstanding === 0
@@ -53,6 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     { label: "Cadets", value: counts.cadets, href: batchHref("/cadets", b), testid: "count-cadets" },
     { label: "NORs", value: counts.nor, href: batchHref("/records", b, { type: "NOR" }), testid: "count-nor" },
     { label: "CROWs", value: counts.crow, href: batchHref("/records", b, { type: "CROW" }), testid: "count-crow" },
+    { label: "IPS", value: counts.ips, href: batchHref("/records", b, { type: "IPS" }), testid: "count-ips" },
     { label: "Statements", value: counts.statements, href: batchHref("/statements", b, { status: "ALL" }), testid: "count-statements" },
     { label: "Overdue", value: counts.overdue, href: batchHref("/statements", b, { status: "OVERDUE" }), testid: "count-overdue", tone: "red" },
     { label: "Not submitted", value: counts.notSubmitted, href: batchHref("/statements", b, { status: "NOT_SUBMITTED" }), testid: "count-not-submitted" },
@@ -64,6 +69,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const quick = [
     { label: "New NOR", href: "/records/new?type=NOR", Icon: Plus },
     { label: "New CROW", href: "/records/new?type=CROW", Icon: Plus },
+    { label: "New IPS", href: "/records/new?type=IPS", Icon: Plus },
     { label: "Request statements", href: "/records/new?type=STATEMENT", Icon: FileText },
     { label: "Review statements", href: "/statements?status=PENDING_REVIEW", Icon: ClipboardList },
   ];
@@ -147,11 +153,46 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
       </section>
 
-      {/* 2. Flagged cadets */}
+      {/* 2. Repeat offences, with the next step on the ladder */}
+      <section aria-labelledby="repeats-h">
+        <SectionTitle
+          id="repeats-h"
+          action={
+            repeats.groups.length > REPEATS_SHOWN ? (
+              <Link href={batchHref("/repeats", b)} className="text-sm font-medium text-navy-700 hover:underline">
+                See all
+              </Link>
+            ) : undefined
+          }
+        >
+          Repeat offences ({repeats.groups.length})
+        </SectionTitle>
+        <p className="-mt-1 mb-2 text-sm text-slate-600">
+          The same cadet doing the same thing again, matched on the words recorded. {repeats.repeats} at one level suggests the next:
+          IPS → Statement → NOR → CROW.{" "}
+          <Link href="/settings#matching" className="underline">
+            Adjust
+          </Link>
+        </p>
+        {repeats.groups.length === 0 ? (
+          <Card className="px-4 py-4 text-sm text-slate-600">No cadet has repeated an offence.</Card>
+        ) : (
+          <>
+            <RepeatList groups={repeats.groups.slice(0, REPEATS_SHOWN)} batchId={ctx.batch.id} contextParam={b} readOnly={ctx.readOnly} />
+            {repeats.groups.length > REPEATS_SHOWN && (
+              <Link href={batchHref("/repeats", b)} className="mt-2 flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-surface text-sm font-medium text-navy-700">
+                + {pluralize(repeats.groups.length - REPEATS_SHOWN, "more repeat offence")}
+              </Link>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 3. Flagged cadets */}
       <section aria-labelledby="flagged-h">
         <SectionTitle id="flagged-h">Cadets flagged for review ({flagged.cadets.length})</SectionTitle>
         <p className="-mt-1 mb-2 text-sm text-slate-600">
-          Flagged at {flagged.recordThreshold}+ separate NOR/CROW occurrences, {flagged.statementThreshold}+ statements, or the same issue repeating.
+          Flagged at {flagged.recordThreshold}+ separate NOR/CROW occurrences, {flagged.ipsThreshold}+ IPS, or {flagged.statementThreshold}+ statements.
           A prompt to check in with the cadet — not a finding.{" "}
           <Link href="/settings" className="underline">
             Adjust
@@ -186,7 +227,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
       </section>
 
-      {/* 3. What the data says */}
+      {/* 4. What the data says */}
       {findings.length > 0 && (
         <section aria-labelledby="insights-h">
           <SectionTitle id="insights-h">What the data says</SectionTitle>
@@ -221,10 +262,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
       )}
 
-      {/* 4. Totals */}
+      {/* 5. Totals */}
       <section aria-labelledby="totals-h">
         <SectionTitle id="totals-h">Batch totals</SectionTitle>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-9">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
           {cards.map((c) => (
             <Link
               key={c.label}
@@ -241,7 +282,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       </section>
 
-      {/* 5. Latest changes */}
+      {/* 6. Latest changes */}
       <section aria-labelledby="activity-h">
         <SectionTitle
           id="activity-h"

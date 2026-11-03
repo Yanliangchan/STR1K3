@@ -4,7 +4,7 @@ import { OUTSTANDING_STATUSES } from "@/lib/labels";
 export type QuickResult = {
   cadets: { id: string; name: string; byteName: string | null; status: string; outstanding: number }[];
   statements: { id: string; title: string; cadetName: string; status: string }[];
-  records: { id: string; type: "NOR" | "CROW"; description: string; cadetName: string }[];
+  records: { id: string; type: "NOR" | "CROW" | "IPS"; description: string; cadetName: string }[];
 };
 
 /** Instant search across the batch for the command palette. */
@@ -70,7 +70,7 @@ export async function recentDescriptions(batchId: string) {
   ]);
   const rank = <T extends { _count: number; _max: { createdAt: Date | null } }>(a: T, b: T) =>
     b._count - a._count || (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0);
-  const pick = (type: "NOR" | "CROW") =>
+  const pick = (type: "NOR" | "CROW" | "IPS") =>
     records
       .filter((r) => r.type === type && r.description.length <= 120)
       .sort(rank)
@@ -79,10 +79,26 @@ export async function recentDescriptions(batchId: string) {
   return {
     NOR: pick("NOR"),
     CROW: pick("CROW"),
+    IPS: pick("IPS"),
     STATEMENT: statements
       .filter((s) => s.title.length <= 120)
       .sort(rank)
       .slice(0, 6)
       .map((s) => ({ description: s.title, categoryId: null as string | null })),
   };
+}
+
+/** Punishments already given for IPS in this batch, most used first, as one-tap picks. */
+export async function recentPunishments(batchId: string, take = 8) {
+  const rows = await prisma.record.groupBy({
+    by: ["punishment"],
+    where: { batchId, type: "IPS", status: "ACTIVE", punishment: { not: null } },
+    _count: true,
+    _max: { createdAt: true },
+  });
+  return rows
+    .filter((r): r is typeof r & { punishment: string } => !!r.punishment && r.punishment.length <= 80)
+    .sort((a, b) => b._count - a._count || (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0))
+    .slice(0, take)
+    .map((r) => r.punishment);
 }

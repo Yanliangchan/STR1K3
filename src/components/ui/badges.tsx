@@ -23,10 +23,11 @@ export function StatusBadge({ status, className }: { status: StatementStatus; cl
 const typeStyle = {
   NOR: "bg-primary text-white",
   CROW: "bg-crow text-white",
+  IPS: "bg-ips text-white",
   STATEMENT: "bg-surface text-slate-700 ring-1 ring-inset ring-slate-300",
 };
 
-export function TypeBadge({ type, className }: { type: "NOR" | "CROW" | "STATEMENT"; className?: string }) {
+export function TypeBadge({ type, className }: { type: "NOR" | "CROW" | "IPS" | "STATEMENT"; className?: string }) {
   return (
     <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide", typeStyle[type], className)}>
       {type === "STATEMENT" ? "Statement" : type}
