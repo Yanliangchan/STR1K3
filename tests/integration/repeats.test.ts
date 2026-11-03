@@ -111,6 +111,29 @@ describe("repeat offences", () => {
     expect((await repeatOffences(batch.id)).groups).toEqual([]);
   });
 
+  it("a statement and a NOR for the same incident (same wording, unlinked) are one offence", async () => {
+    const u = await makeUser();
+    const { batch, cadets } = await makeBatch(u, { cadets: 2 });
+    const [a, b] = cadets as [(typeof cadets)[0], (typeof cadets)[0]];
+    const text = "Taking out Orca shirt right outside of SAFTI MI Side Gate";
+    await give(u, batch.id, a.id, "STATEMENT", text, "2026-10-14");
+    await give(u, batch.id, a.id, "NOR", text, "2026-10-16");
+    expect((await repeatOffences(batch.id)).groups).toEqual([]);
+
+    // The same wording on separate days, at the same level, is a genuine repeat.
+    await give(u, batch.id, b.id, "IPS", "Late for parade", "2026-10-01");
+    await give(u, batch.id, b.id, "IPS", "Late for parade", "2026-10-09");
+    const { groups } = await repeatOffences(batch.id);
+    expect(groups.map((g) => g.cadetId)).toEqual([b.id]);
+
+    // …and a later incident joins the merged one as a second offence.
+    await give(u, batch.id, a.id, "IPS", "Orca shirt worn outside the gate", "2026-10-25");
+    const again = (await repeatOffences(batch.id, { cadetId: a.id })).groups[0]!;
+    expect(again.occurrences).toBe(2);
+    expect(again.entries).toHaveLength(3);
+    expect(again.suggestion.kind).toBe("NOR"); // highest level so far is one NOR
+  });
+
   it("matches on a shared category even with different wording", async () => {
     const u = await makeUser();
     const { batch, cadets } = await makeBatch(u, { cadets: 1 });

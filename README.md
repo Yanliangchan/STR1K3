@@ -195,7 +195,7 @@ No AI is involved, and every match says *why*: "Same offence ×2 · matched on �
 5. **Typos.** A one-letter slip on a word of 6+ letters (*unifrom*) is folded into the spelling used more often in the batch.
 6. **Over-common words count for less.** A word used in 30%+ of the batch's entries (once there are 15+) only creates a match together with a second such word.
 7. **Same category** also counts as the same offence.
-8. **One event counts once.** Entries linked to one shared occurrence (e.g. a NOR and a statement for the same incident) are one offence, not a repeat.
+8. **One incident counts once.** Entries linked to one shared occurrence are one offence. So is the usual *statement first, then NOR* for the same incident, even when they aren't linked: near-identical wording (80%+ of words the same) for a statement and a record within 7 days, or any two entries on the same day. The same wording on different days at the same level (e.g. two IPS for "Late for parade") is still a repeat.
 9. **"Not the same offence"** hides a wrong suggestion (with Undo). If another matching entry is recorded later, it comes back.
 
 Settings also has a **Try it** box that shows which words a description would be matched on, before you save. The look-back window ("Only look back (days)") applies here too.

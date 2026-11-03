@@ -19,6 +19,26 @@ import { addDaysISO, dateOnlyISO, parseISODate, todayISO } from "@/lib/dates";
 import { commonTerms, createMatcher, typoMap, type Term } from "@/lib/offence-match";
 import { getAppConfig } from "./config";
 
+/** Same incident: near-identical wording (shared words / all words)… */
+export const SAME_INCIDENT_SIMILARITY = 0.8;
+/** …on the same day, or a statement and a record within this many days of each other. */
+export const SAME_INCIDENT_DAYS = 7;
+const MATCHED_SHOWN = 4;
+
+class UnionFind {
+  private parent: number[];
+  constructor(n: number) {
+    this.parent = Array.from({ length: n }, (_, i) => i);
+  }
+  find(i: number): number {
+    while (this.parent[i] !== i) i = this.parent[i] = this.parent[this.parent[i]!]!;
+    return i;
+  }
+  join(a: number, b: number) {
+    this.parent[this.find(a)] = this.find(b);
+  }
+}
+
 export const LADDER = ["IPS", "STATEMENT", "NOR", "CROW"] as const;
 export type LadderKind = (typeof LADDER)[number];
 export type Suggestion = { level: number; kind: LadderKind | "BEYOND"; label: string; reason: string };
@@ -32,7 +52,6 @@ export const ladderLabel = (level: number, plural = false) =>
         ? "IPS"
         : `${LADDER[level]}${plural ? "s" : ""}`;
 
-const article = (level: number) => (LADDER[level] === "NOR" ? "an" : "a");
 const ladderTitle = (level: number) => (LADDER[level] === "STATEMENT" ? "Statement" : LADDER[level]!);
 
 export type RepeatEntry = {
@@ -88,14 +107,14 @@ function suggest(levels: number[], repeats: number): Suggestion {
       level: next,
       kind: next >= LADDER.length ? "BEYOND" : LADDER[next]!,
       label: next >= LADDER.length ? "Refer beyond CROW" : `Next: ${ladderTitle(next)}`,
-      reason: `${atTop} ${ladderLabel(top, atTop !== 1)} already for this — the ladder steps up to ${next >= LADDER.length ? "action beyond a CROW (e.g. refer to the OC)" : `${article(next)} ${ladderLabel(next)}`}.`,
+      reason: `${atTop} ${ladderLabel(top, atTop !== 1)} already for this — the ladder steps up to ${next >= LADDER.length ? "action beyond a CROW (e.g. refer to the OC)" : `a ${ladderLabel(next)}`}.`,
     };
   }
   return {
     level: top,
     kind: LADDER[top]!,
     label: `Next: ${ladderTitle(top)}`,
-    reason: `${atTop} of ${repeats} ${ladderLabel(top, true)} before stepping up to ${top + 1 >= LADDER.length ? "action beyond a CROW" : `${article(top + 1)} ${ladderLabel(top + 1)}`}.`,
+    reason: `${atTop} of ${repeats} ${ladderLabel(top, true)} before stepping up to ${top + 1 >= LADDER.length ? "action beyond a CROW" : `a ${ladderLabel(top + 1)}`}.`,
   };
 }
 
@@ -164,62 +183,99 @@ export async function repeatOffences(batchId: string, opts: { cadetId?: string }
   const labelOf = (key: string) => [...(labels.get(key)?.entries() ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0] ?? key;
   const common = commonTerms(count(entries), entries.length);
 
-  // Candidate match keys per entry: each distinctive term, and pairs of common terms
-  // (a common word only counts when a second one matches with it).
-  const byCadet = new Map<string, Map<string, Entry[]>>();
-  for (const e of entries) {
-    if (opts.cadetId && e.cadetId !== opts.cadetId) continue;
-    const keys = e.terms.filter((t) => !common.has(t.key)).map((t) => t.key);
-    const commons = e.terms.filter((t) => common.has(t.key)).map((t) => t.key).sort();
-    for (let i = 0; i < commons.length; i++) for (let j = i + 1; j < commons.length; j++) keys.push(`${commons[i]}+${commons[j]}`);
-    const m = byCadet.get(e.cadetId) ?? new Map<string, Entry[]>();
-    for (const k of keys) m.set(k, [...(m.get(k) ?? []), e]);
-    byCadet.set(e.cadetId, m);
+  const weight = (t: string) => (common.has(t) ? 0.5 : 1);
+  const sum = (ts: string[]) => ts.reduce((n, t) => n + weight(t), 0);
+  const wordsOf = (e: Entry) => e.terms.filter((t) => !t.key.startsWith("cat:")).map((t) => t.key);
+  const categoryOf = (e: Entry) => e.terms.find((t) => t.key.startsWith("cat:"))?.key ?? null;
+  const daysApart = (a: string, b: string) => Math.abs(parseISODate(a).getTime() - parseISODate(b).getTime()) / 86400_000;
+
+  /** Same incident recorded twice, e.g. a statement then a NOR with the same wording. */
+  function sameIncident(a: Entry, b: Entry) {
+    const wa = wordsOf(a);
+    const wb = new Set(wordsOf(b));
+    if (!wa.length || !wb.size) return false;
+    const shared = wa.filter((t) => wb.has(t)).length;
+    const similar = shared / new Set([...wa, ...wb]).size >= SAME_INCIDENT_SIMILARITY;
+    if (!similar) return false;
+    const gap = daysApart(a.date, b.date);
+    return gap === 0 || (a.kind !== b.kind && gap <= SAME_INCIDENT_DAYS);
   }
 
-  const dismissedBy = new Map<string, { term: string; keys: Set<string> }[]>();
-  for (const d of dismissals) dismissedBy.set(d.cadetId, [...(dismissedBy.get(d.cadetId) ?? []), { term: d.term, keys: new Set(d.entryKeys) }]);
+  /** Same offence: a shared word (an over-common word only counts with a second one), or the same category. */
+  function sameOffence(a: Entry, b: Entry) {
+    const ca = categoryOf(a);
+    if (ca && ca === categoryOf(b)) return true;
+    const setB = new Set(wordsOf(b));
+    return sum(wordsOf(a).filter((t) => setB.has(t))) >= 1;
+  }
+
+  const byCadet = new Map<string, Entry[]>();
+  for (const e of entries) {
+    if (opts.cadetId && e.cadetId !== opts.cadetId) continue;
+    byCadet.set(e.cadetId, [...(byCadet.get(e.cadetId) ?? []), e]);
+  }
+  const dismissedBy = new Map<string, Set<string>[]>();
+  for (const d of dismissals) dismissedBy.set(d.cadetId, [...(dismissedBy.get(d.cadetId) ?? []), new Set(d.entryKeys)]);
 
   const groups: RepeatGroup[] = [];
-  for (const [cadetId, m] of byCadet) {
-    // Keys with 2+ separate occurrences; keys covering the same entries merge into one group.
-    const merged = new Map<string, { keys: string[]; list: Entry[] }>();
-    for (const [k, list] of m) {
-      if (new Set(list.map((e) => e.unit)).size < 2) continue;
-      const sig = list.map((e) => e.key).sort().join(",");
-      const g = merged.get(sig) ?? { keys: [], list };
-      g.keys.push(k);
-      merged.set(sig, g);
+  for (const [cadetId, list] of byCadet) {
+    // 1. Entries about one incident (shared occurrence, or the same wording recorded as
+    //    statement + NOR) become one unit.
+    const unit = new UnionFind(list.length);
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (list[i]!.unit === list[j]!.unit || sameIncident(list[i]!, list[j]!)) unit.join(i, j);
+      }
     }
-    const all = [...merged.values()];
-    const kept = all.filter((g) => {
-      const mine = new Set(g.list.map((e) => e.key));
-      // Drop a group whose entries are all inside a bigger group.
-      if (all.some((o) => o !== g && o.list.length > g.list.length && g.list.every((e) => o.list.some((x) => x.key === e.key)))) return false;
-      const ds = dismissedBy.get(cadetId) ?? [];
-      return !ds.some((d) => g.keys.includes(d.term) && [...mine].every((k) => d.keys.has(k)));
-    });
-    for (const g of kept) {
-      // Category matches read best last; distinctive words first.
-      g.keys.sort((a, b) => Number(a.startsWith("cat:")) - Number(b.startsWith("cat:")) || a.localeCompare(b));
-      const units = new Map<string, number>();
-      for (const e of g.list) units.set(e.unit, Math.max(units.get(e.unit) ?? 0, e.level));
-      const list = [...g.list].sort((a, b) => a.date.localeCompare(b.date));
-      const first = list[0]!;
-      const catLabel = (k: string) => g.list.flatMap((e) => e.terms).find((t) => t.key === k)?.label ?? k;
+    // 2. Units describing the same offence are linked into one group.
+    const offence = new UnionFind(list.length);
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (unit.find(i) === unit.find(j) || sameOffence(list[i]!, list[j]!)) offence.join(i, j);
+      }
+    }
+    const comps = new Map<number, number[]>();
+    for (let i = 0; i < list.length; i++) comps.set(offence.find(i), [...(comps.get(offence.find(i)) ?? []), i]);
+
+    for (const idx of comps.values()) {
+      const members = idx.map((i) => list[i]!);
+      const units = new Map<number, number>();
+      for (const i of idx) units.set(unit.find(i), Math.max(units.get(unit.find(i)) ?? 0, list[i]!.level));
+      if (units.size < 2) continue;
+      const keysInGroup = new Set(members.map((e) => e.key));
+      if ((dismissedBy.get(cadetId) ?? []).some((d) => [...keysInGroup].every((k) => d.has(k)))) continue;
+
+      // What the incidents have in common: terms found in 2+ of them, most shared first.
+      const termUnits = new Map<string, Set<number>>();
+      const termLabel = new Map<string, string>();
+      for (const i of idx) {
+        for (const t of list[i]!.terms) {
+          termUnits.set(t.key, (termUnits.get(t.key) ?? new Set()).add(unit.find(i)));
+          if (!termLabel.has(t.key)) termLabel.set(t.key, t.label);
+        }
+      }
+      const keys = [...termUnits.entries()]
+        .filter(([, u]) => u.size >= 2)
+        .sort((a, b) => b[1].size - a[1].size || Number(a[0].startsWith("cat:")) - Number(b[0].startsWith("cat:")) || a[0].localeCompare(b[0]))
+        .map(([k]) => k);
+      const shown = keys.slice(0, MATCHED_SHOWN).map((k) =>
+        k.startsWith("cat:") ? termLabel.get(k)! : `“${k.startsWith("syn:") ? termLabel.get(k)! : labelOf(k)}”`,
+      );
+      if (keys.length > MATCHED_SHOWN) shown.push(`+${keys.length - MATCHED_SHOWN} more`);
+
+      const sorted = [...members].sort((a, b) => a.date.localeCompare(b.date));
+      const first = sorted[0]!;
       groups.push({
-        id: `${cadetId}|${g.keys[0]}`,
+        id: `${cadetId}|${sorted.map((e) => e.key).join(",")}`,
         cadetId,
         cadetName: first.cadetName,
         byteName: first.byteName,
-        keys: g.keys,
-        matchedOn: g.keys.map((k) =>
-          k.startsWith("cat:") ? catLabel(k) : `“${k.startsWith("syn:") ? catLabel(k) : k.split("+").map(labelOf).join(" + ")}”`,
-        ),
-        entries: list.map(({ key, id, kind, date, text, punishment }) => ({ key, id, kind, date, text, punishment })),
+        keys: keys.length ? keys : ["similar"],
+        matchedOn: shown.length ? shown : ["similar wording"],
+        entries: sorted.map(({ key, id, kind, date, text, punishment }) => ({ key, id, kind, date, text, punishment })),
         occurrences: units.size,
         suggestion: suggest([...units.values()], cfg.repeats),
-        latest: list.at(-1)!.date,
+        latest: sorted.at(-1)!.date,
       });
     }
   }
